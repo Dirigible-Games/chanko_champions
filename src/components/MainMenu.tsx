@@ -34,8 +34,12 @@ export default function MainMenu({ hasSave, onNewGame, onContinue }: MainMenuPro
           <div className="w-24 h-24 bg-sumo-ink rounded-full flex items-center justify-center border-4 border-sumo-earth/30 shadow-2xl mb-6 relative">
             <Trophy className="text-white w-10 h-10" />
           </div>
-          <h1 className="text-4xl font-serif font-black italic tracking-widest text-[#2A2A2A] leading-none mb-2">CHANKO</h1>
-          <p className="text-[10px] font-black uppercase tracking-[0.4em] text-sumo-earth">The Sumo Sim</p>
+          <h1 className="text-4xl font-serif font-black italic tracking-widest leading-none mb-1">
+            <span className="text-[#1A1A1A]">CHANKO</span>
+            <br />
+            <span className="text-[#CC0000]">CHAMPIONS</span>
+          </h1>
+          <p className="text-[10px] font-black uppercase tracking-[0.4em] text-sumo-earth opacity-60">The Sumo Simulator</p>
         </motion.div>
 
         {/* Action Buttons */}
@@ -110,16 +114,19 @@ export default function MainMenu({ hasSave, onNewGame, onContinue }: MainMenuPro
           </AnimatePresence>
         </motion.div>
         
-        {/* Footer Credit */}
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1 }}
-          className="absolute bottom-8 text-[9px] font-bold uppercase tracking-widest opacity-30 flex items-center gap-2"
-        >
-          <Github size={10} /> Chanko Engine v0.1
-        </motion.div>
       </div>
+
+      {/* Footer Credit - Positioned Absolutely relative to the whole screen */}
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1 }}
+        className="absolute bottom-6 left-0 right-0 flex justify-center items-center gap-2 pointer-events-none z-0"
+      >
+        <span className="text-[9px] font-bold uppercase tracking-[0.3em] text-[#CC0000] flex items-center gap-1.5">
+          <Github size={10} /> Chanko Engine v0.1
+        </span>
+      </motion.div>
     </div>
   );
 }
