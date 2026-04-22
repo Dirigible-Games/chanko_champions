@@ -467,7 +467,7 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
 
     // Injury Trigger Check
     const baseThreshold = getBaseInjuryThreshold(rikishi.bashosCompleted);
-    const thresholdReduction = getFatigueThresholdReduction(state.fatigue);
+    const thresholdReduction = getFatigueThresholdReduction(rikishi.fatigue);
     const currentThreshold = baseThreshold - thresholdReduction;
     
     if (oRoll.total > currentThreshold) {
