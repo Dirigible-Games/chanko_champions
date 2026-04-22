@@ -117,6 +117,7 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
     nextAttackerId: 'player' | 'opponent';
   } | null>(null);
   const [selectedMove, setSelectedMove] = useState<Kimarite | null>(null);
+  const [opponentMove, setOpponentMove] = useState<Kimarite | null>(null);
   const [showDice, setShowDice] = useState<{ 
     id: string, 
     player: { rolls: number[], total: number, usedFocus: boolean, usedFatigue: boolean, maxVal: number, irVal: number, moveName: string, statBonus: number, roundBonus: number, counterVal: number, primaryAttr: AttributeKey, secondaryAttr: AttributeKey, primaryVal: number, secondaryVal: number }, 
@@ -152,7 +153,8 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
   const handleStanceSelected = (stance: Stance) => {
     if (!pendingStanceSelection) return;
     
-    addLog(`Transitions into ${stance} stance.`);
+    const rikishiName = pendingStanceSelection.nextAttackerId === 'player' ? rikishi.name : opponent.name;
+    addLog(`${rikishiName} transitions into ${stance} stance.`);
     
     const isPlayerNextAttacker = pendingStanceSelection.nextAttackerId === 'player';
     
@@ -167,6 +169,7 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
     setPendingStanceSelection(null);
     setIsRolling(false);
     setSelectedMove(null);
+    setOpponentMove(null);
   };
 
   const executeTachiai = (move: Kimarite) => {
@@ -177,6 +180,7 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
 
     // Opponent picks AI Tachiai
     const opponentMove = selectNPCMove(opponent, TACHIAI_MOVES, true);
+    setOpponentMove(opponentMove);
     
     // NPC Resources
     const oResources = decideNPCResources(opponent, rikishi);
@@ -270,6 +274,7 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
           addLog('MATTA! A false start! The rikishi reset...');
           setIsRolling(false);
           setSelectedMove(null);
+          setOpponentMove(null);
         } else if (result.includes('critical')) {
           const winner = result === 'player_critical' ? 'player' : 'opponent';
           setState(prev => ({
@@ -296,7 +301,8 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
             setPhase('stance_selection');
           } else {
             const nextStance = nextStances[Math.floor(Math.random() * nextStances.length)];
-            addLog(`Transitions into ${nextStance} stance.`);
+            const winnerName = winner === 'player' ? rikishi.name : opponent.name;
+            addLog(`${winnerName} transitions into ${nextStance} stance.`);
             
             setState(prev => ({
               ...prev,
@@ -308,6 +314,7 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
             setPhase('combat');
             setIsRolling(false);
             setSelectedMove(null);
+            setOpponentMove(null);
           }
         }
       }, 4500); // Wait for the sequenced dice animation (Player 5 -> total, Opponent 5 -> total)
@@ -332,6 +339,7 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
     }
 
     const oResources = decideNPCResources(opponent, rikishi);
+    setOpponentMove(opponentMove);
 
     setTimeout(() => {
       const roundBonus = state.round;
@@ -450,6 +458,7 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
               setPhase('tachiai');
               setIsRolling(false);
               setSelectedMove(null);
+              setOpponentMove(null);
             } else {
               addLog("Ruling reversed!");
               const winnerId = 'opponent';
@@ -489,7 +498,8 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
             setPhase('stance_selection');
           } else {
             const nextStance = nextStances[Math.floor(Math.random() * nextStances.length)];
-            addLog(`Transitions into ${nextStance} stance.`);
+            const defenderName = isPlayerAttacking ? opponent.name : rikishi.name;
+            addLog(`${defenderName} transitions into ${nextStance} stance.`);
             
             setState(prev => ({
               ...prev,
@@ -500,6 +510,7 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
             }));
             setIsRolling(false);
             setSelectedMove(null);
+            setOpponentMove(null);
           }
         }
       }, 4500); // 4500ms timeout to wait for the staggered sequential dice UI animation to fully complete
@@ -564,177 +575,183 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
       </div>
 
       {/* Action Logs & Dice Visualizer */}
-      <div className="flex-1 min-h-[140px] overflow-y-auto flex flex-col justify-center items-center p-4 bg-sumo-paper shadow-inner border-y border-sumo-earth/10 relative">
+      <div className="flex-1 min-h-[220px] flex flex-col items-center p-4 bg-sumo-paper shadow-inner border-y border-sumo-earth/10 relative">
         <div className="absolute inset-0 bg-[url('/clay-texture.png')] opacity-5 pointer-events-none" />
         
-        {/* Dice Area (Takes up top half of the log area when active) */}
-        <div className="w-full flex flex-col items-center justify-end flex-shrink-0 mb-2">
-          {(isRolling || showDice) && (
-            <AnimatePresence mode="wait">
+        {/* Dice Area (Fixed Height Stage) */}
+        <div className="w-full flex-shrink-0 h-[200px] mb-4 relative flex items-center justify-center">
+          <AnimatePresence>
+            {(isRolling || showDice) && (
               <motion.div 
-                key={showDice ? showDice.id : 'rolling'}
-                className="flex gap-4 justify-center items-center py-4 bg-white/80 rounded-2xl border border-sumo-earth/30 w-full max-w-md relative z-10 shadow-sm px-4 min-h-[160px]"
+                key="dice-stage"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="flex gap-4 justify-center items-center py-4 bg-white/90 rounded-2xl border border-sumo-earth/30 w-full max-w-sm z-10 shadow-md px-4 h-full"
               >
-                 <div className="text-center flex flex-col items-center flex-1 h-full justify-between">
-                   <div className="flex flex-col items-center justify-end mb-2 h-[60px] w-full">
-                     <p className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-1 text-sumo-ink">You</p>
-                     {showDice && (
-                       <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center w-full">
-                         <div className="text-sm font-black text-sumo-ink leading-tight text-center">{showDice.player.moveName}</div>
-                         <div className="flex gap-2 mt-1 justify-center items-center">
-                           <div className="flex items-center gap-1"><AttributeIcon attr={showDice.player.primaryAttr} size={10}/><span className="text-[10px] font-mono font-bold leading-none text-sumo-ink">{showDice.player.primaryVal}</span></div>
-                           <div className="flex items-center gap-1"><AttributeIcon attr={showDice.player.secondaryAttr} size={10}/><span className="text-[10px] font-mono font-bold leading-none text-sumo-ink">{showDice.player.secondaryVal}</span></div>
+                 {/* Player Side */}
+                 <div className="text-center flex flex-col items-center flex-1 h-full">
+                   <div className="h-[75px] w-full flex flex-col items-center justify-start">
+                     <p className="text-[9px] font-black uppercase tracking-widest opacity-40 mb-1 text-sumo-ink">You</p>
+                     {(showDice || selectedMove) && (
+                       <div className="flex flex-col items-center w-full">
+                         <div className="text-sm font-black text-sumo-ink leading-tight text-center truncate w-full">
+                           {showDice?.player.moveName || selectedMove?.name}
                          </div>
-                         <div className="flex gap-1.5 mt-1 min-h-[14px]">
-                           {showDice.player.statBonus > 0 && <BonusTooltip label={`+${showDice.player.statBonus} Stat Adv.`} content={`Stat Advantage: Bonus added to your roll from having higher attributes than your opponent for this specific move.`} />}
-                           {showDice.player.roundBonus > 0 && <BonusTooltip label={`+${showDice.player.roundBonus} Offense Bonus`} content={`Offense Bonus: Bonus points added to the attacker's roll equal to the current round number.`} />}
-                           {showDice.player.counterVal > 0 && <BonusTooltip label={`+ir${showDice.player.counterVal} Counter`} content={`Counter: By choosing a move that counters the opponent's move, any individual die you roll below ${showDice.player.counterVal} is automatically raised to ${showDice.player.counterVal}.`} />}
+                         <div className="flex gap-2 mt-1 justify-center items-center h-[14px]">
+                           <div className="flex items-center gap-1">
+                             <AttributeIcon attr={showDice?.player.primaryAttr || selectedMove?.primaryAttr} size={10}/>
+                             <span className="text-[10px] font-mono font-bold leading-none text-sumo-ink">
+                               {showDice?.player.primaryVal || (selectedMove && playerStats[selectedMove.primaryAttr]) || '-'}
+                             </span>
+                           </div>
+                           <div className="flex items-center gap-1">
+                             <AttributeIcon attr={showDice?.player.secondaryAttr || selectedMove?.secondaryAttr} size={10}/>
+                             <span className="text-[10px] font-mono font-bold leading-none text-sumo-ink">
+                               {showDice?.player.secondaryVal || (selectedMove && playerStats[selectedMove.secondaryAttr]) || '-'}
+                             </span>
+                           </div>
                          </div>
-                       </motion.div>
+                         <div className="flex gap-1 mt-1.5 h-[14px] items-center justify-center">
+                           {showDice?.player.statBonus > 0 && <BonusTooltip label={`+${showDice.player.statBonus} Stat`} content="Stat Advantage Bonus" />}
+                           {showDice?.player.roundBonus > 0 && <BonusTooltip label={`+${showDice.player.roundBonus} Off.`} content="Offense Bonus" />}
+                           {showDice?.player.counterVal > 0 && <BonusTooltip label={`+ir${showDice.player.counterVal} Ctr.`} content="Counter Bonus" />}
+                         </div>
+                       </div>
                      )}
                    </div>
                    
-                   {showDice ? (
-                     <>
-                       <div className="flex gap-1 mb-1 justify-center w-full">
-                         {showDice.player.rolls.map((d, i) => (
+                   <div className="h-[30px] flex items-center justify-center w-full">
+                     {showDice ? (
+                       <div className="flex gap-0.5 justify-center w-full">
+                         {showDice.player.rolls.map((d: number, i: number) => (
                            <motion.div 
-                             key={i} 
-                             initial={{ opacity: 0, y: -20, rotateX: 180, backgroundColor: "#ffffff" }}
-                             animate={{ 
-                               opacity: 1, y: 0, rotateX: 0, 
-                               backgroundColor: ["#ffffff", getFlashColor(d, showDice.player.maxVal, "#1a1a1a"), "#1a1a1a"] 
-                             }}
+                             key={`${showDice.id}-p-${i}`} 
+                             initial={{ opacity: 0, y: -10, rotateX: 180 }}
+                             animate={{ opacity: 1, y: 0, rotateX: 0, backgroundColor: ["#ffffff", getFlashColor(d, showDice.player.maxVal, "#1a1a1a"), "#1a1a1a"] }}
                              transition={{ 
-                               duration: 0.5, 
-                               delay: i * 0.3, 
+                               duration: 0.4, 
+                               delay: i * 0.2, 
                                type: "spring",
-                               backgroundColor: { duration: 0.8, delay: i * 0.3 }
+                               backgroundColor: { type: "tween", duration: 0.6, delay: i * 0.2 }
                              }}
-                             className="w-6 h-6 text-white rounded text-[10px] flex items-center justify-center font-mono font-bold shadow-md"
+                             className="w-5 h-5 text-white rounded text-[9px] flex items-center justify-center font-mono font-bold shadow-sm"
                            >
                              {d}
                            </motion.div>
                          ))}
                        </div>
+                     ) : (
+                       <div className="animate-pulse flex gap-1 items-center justify-center">
+                         {[1,2,3,4,5].map(i => <div key={i} className="w-5 h-5 bg-sumo-beige/40 rounded shadow-inner" />)}
+                       </div>
+                     )}
+                   </div>
+
+                   <div className="h-[45px] flex flex-col items-center justify-center mt-auto">
+                     {showDice && (
                        <motion.div 
-                         initial={{ opacity: 0, scale: 0.5 }}
-                         animate={{ opacity: 1, scale: 1 }}
-                         transition={{ delay: 1.5, type: "spring", bounce: 0.6 }} // After player dice (5 * 0.3 = 1.5s delay)
-                         className="flex flex-col items-center mt-2 min-h-[32px]"
+                         initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 1.2 }}
+                         className="flex flex-col items-center"
                        >
-                         <span className="text-xl font-serif italic font-bold text-sumo-ink leading-none">
-                           {showDice.player.total}
-                         </span>
-                         <span className="text-[9px] font-bold opacity-40 mt-1 tracking-tighter">
-                           (5d{showDice.player.maxVal}{showDice.player.irVal > 0 ? ` ir${showDice.player.irVal}` : ''})
-                         </span>
+                         <span className="text-xl font-serif italic font-black text-sumo-ink leading-none">{showDice.player.total}</span>
+                         <span className="text-[8px] font-bold opacity-40 mt-0.5">(5d{showDice.player.maxVal}{showDice.player.irVal > 0 ? ` ir${showDice.player.irVal}` : ''})</span>
                        </motion.div>
-                       {/* Player Resource Badges */}
-                       {(showDice.player.usedFocus || showDice.player.usedFatigue) && (
-                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.6 }} className="flex gap-1 mt-1 justify-center">
-                           {showDice.player.usedFocus && <div className="text-[8px] bg-orange-500 text-white px-1.5 py-0.5 rounded uppercase font-black flex items-center shadow-sm"><Zap size={8} className="mr-0.5" />Focus</div>}
-                           {showDice.player.usedFatigue && <div className="text-[8px] bg-red-600 text-white px-1.5 py-0.5 rounded uppercase font-black flex items-center shadow-sm"><AlertCircle size={8} className="mr-0.5" />Fatigue</div>}
-                         </motion.div>
-                       )}
-                     </>
-                   ) : (
-                      <div className="animate-pulse flex gap-1 mb-4 h-[64px] items-center justify-center">
-                        {[1,2,3,4,5].map(i => <div key={i} className="w-6 h-6 bg-sumo-beige/50 rounded" />)}
-                      </div>
-                   )}
+                     )}
+                   </div>
                  </div>
                  
-                 <div className="text-2xl font-black italic opacity-10 mx-[-4px] text-sumo-ink">VS</div>
+                 <div className="text-xl font-black italic opacity-20 text-sumo-ink px-2">VS</div>
                  
-                 <div className="text-center flex flex-col items-center flex-1 h-full justify-between">
-                   <div className="flex flex-col items-center justify-end mb-2 h-[60px] w-full">
-                     <p className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-1 text-sumo-ink">Enemy</p>
-                     {showDice && (
-                       <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 2.0 }} className="flex flex-col items-center w-full">
-                         <div className="text-sm font-black text-sumo-ink leading-tight text-center">{showDice.opponent.moveName}</div>
-                         <div className="flex gap-2 mt-1 justify-center items-center">
-                           <div className="flex items-center gap-1"><AttributeIcon attr={showDice.opponent.primaryAttr} size={10}/><span className="text-[10px] font-mono font-bold leading-none text-sumo-ink">{showDice.opponent.primaryVal}</span></div>
-                           <div className="flex items-center gap-1"><AttributeIcon attr={showDice.opponent.secondaryAttr} size={10}/><span className="text-[10px] font-mono font-bold leading-none text-sumo-ink">{showDice.opponent.secondaryVal}</span></div>
+                 {/* Enemy Side */}
+                 <div className="text-center flex flex-col items-center flex-1 h-full">
+                   <div className="h-[75px] w-full flex flex-col items-center justify-start">
+                     <p className="text-[9px] font-black uppercase tracking-widest opacity-40 mb-1 text-sumo-ink">Enemy</p>
+                     {(showDice || opponentMove) && (
+                       <div className="flex flex-col items-center w-full">
+                         <div className="text-sm font-black text-sumo-ink leading-tight text-center truncate w-full">
+                           {showDice?.opponent.moveName || opponentMove?.name}
                          </div>
-                         <div className="flex gap-1.5 mt-1 min-h-[14px]">
-                           {showDice.opponent.statBonus > 0 && <BonusTooltip label={`+${showDice.opponent.statBonus} Stat Adv.`} content={`Stat Advantage: Bonus added to the roll from having higher attributes than the target for this specific move.`} />}
-                           {showDice.opponent.roundBonus > 0 && <BonusTooltip label={`+${showDice.opponent.roundBonus} Offense Bonus`} content={`Offense Bonus: Bonus points added to the attacker's roll equal to the current round number.`} />}
-                           {showDice.opponent.counterVal > 0 && <BonusTooltip label={`+ir${showDice.opponent.counterVal} Counter`} content={`Counter: By choosing a move that counters the opponent's move, any individual die the opponent rolls below ${showDice.opponent.counterVal} is automatically raised to ${showDice.opponent.counterVal}.`} />}
+                         <div className="flex gap-2 mt-1 justify-center items-center h-[14px]">
+                           <div className="flex items-center gap-1">
+                             <AttributeIcon attr={showDice?.opponent.primaryAttr || opponentMove?.primaryAttr} size={10}/>
+                             <span className="text-[10px] font-mono font-bold leading-none text-sumo-ink">
+                               {showDice?.opponent.primaryVal || (opponentMove && opponentStats[opponentMove.primaryAttr]) || '-'}
+                             </span>
+                           </div>
+                           <div className="flex items-center gap-1">
+                             <AttributeIcon attr={showDice?.opponent.secondaryAttr || opponentMove?.secondaryAttr} size={10}/>
+                             <span className="text-[10px] font-mono font-bold leading-none text-sumo-ink">
+                               {showDice?.opponent.secondaryVal || (opponentMove && opponentStats[opponentMove.secondaryAttr]) || '-'}
+                             </span>
+                           </div>
                          </div>
-                       </motion.div>
+                         <div className="flex gap-1 mt-1.5 h-[14px] items-center justify-center">
+                           {showDice?.opponent.statBonus > 0 && <BonusTooltip label={`+${showDice.opponent.statBonus} Stat`} content="Stat Advantage Bonus" />}
+                           {showDice?.opponent.roundBonus > 0 && <BonusTooltip label={`+${showDice.opponent.roundBonus} Off.`} content="Offense Bonus" />}
+                           {showDice?.opponent.counterVal > 0 && <BonusTooltip label={`+ir${showDice.opponent.counterVal} Ctr.`} content="Counter Bonus" />}
+                         </div>
+                       </div>
                      )}
                    </div>
                    
-                   {showDice ? (
-                     <>
-                       <div className="flex gap-1 mb-1 justify-center w-full">
-                         {showDice.opponent.rolls.map((d, i) => (
+                   <div className="h-[30px] flex items-center justify-center w-full">
+                     {showDice ? (
+                       <div className="flex gap-0.5 justify-center w-full">
+                         {showDice.opponent.rolls.map((d: number, i: number) => (
                            <motion.div 
-                             key={i} 
-                             initial={{ opacity: 0, y: -20, rotateX: 180, backgroundColor: "#ffffff" }}
-                             animate={{ 
-                               opacity: 1, y: 0, rotateX: 0,
-                               backgroundColor: ["#ffffff", getFlashColor(d, showDice.opponent.maxVal, "#991b1b"), "#991b1b"]
-                             }}
+                             key={`${showDice.id}-o-${i}`} 
+                             initial={{ opacity: 0, y: -10, rotateX: 180 }}
+                             animate={{ opacity: 1, y: 0, rotateX: 0, backgroundColor: ["#ffffff", getFlashColor(d, showDice.opponent.maxVal, "#991b1b"), "#991b1b"] }} 
                              transition={{ 
-                               duration: 0.5, 
-                               delay: 2.0 + (i * 0.3), // Wait for player sequence to finish before starting
+                               duration: 0.4, 
+                               delay: 1.5 + (i * 0.2), 
                                type: "spring",
-                               backgroundColor: { duration: 0.8, delay: 2.0 + (i * 0.3) }
+                               backgroundColor: { type: "tween", duration: 0.6, delay: 1.5 + (i * 0.2) }
                              }}
-                             className="w-6 h-6 text-white rounded text-[10px] flex items-center justify-center font-mono font-bold shadow-md"
+                             className="w-5 h-5 text-white rounded text-[9px] flex items-center justify-center font-mono font-bold shadow-sm"
                            >
                              {d}
                            </motion.div>
                          ))}
                        </div>
+                     ) : (
+                       <div className="animate-pulse flex gap-1 items-center justify-center">
+                         {[1,2,3,4,5].map(i => <div key={i} className="w-5 h-5 bg-sumo-beige/40 rounded shadow-inner" />)}
+                       </div>
+                     )}
+                   </div>
+
+                   <div className="h-[45px] flex flex-col items-center justify-center mt-auto">
+                     {showDice && (
                        <motion.div 
-                         initial={{ opacity: 0, scale: 0.5 }}
-                         animate={{ opacity: 1, scale: 1 }}
-                         transition={{ delay: 3.5, type: "spring", bounce: 0.6 }} // After opponent dice sequence finishes
-                         className="flex flex-col items-center mt-2 min-h-[32px]"
+                         initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 2.7 }}
+                         className="flex flex-col items-center"
                        >
-                         <span className="text-xl font-serif italic text-red-800 font-bold leading-none">
-                           {showDice.opponent.total}
-                         </span>
-                         <span className="text-[9px] font-bold opacity-40 mt-1 tracking-tighter text-red-800/80">
-                           (5d{showDice.opponent.maxVal}{showDice.opponent.irVal > 0 ? ` ir${showDice.opponent.irVal}` : ''})
-                         </span>
+                         <span className="text-xl font-serif italic font-black text-red-800 leading-none">{showDice.opponent.total}</span>
+                         <span className="text-[8px] font-bold opacity-40 mt-0.5 tracking-tighter text-red-800/80">(5d{showDice.opponent.maxVal}{showDice.opponent.irVal > 0 ? ` ir${showDice.opponent.irVal}` : ''})</span>
                        </motion.div>
-                       {/* Opponent Resource Badges */}
-                       {(showDice.opponent.usedFocus || showDice.opponent.usedFatigue) && (
-                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 3.6 }} className="flex gap-1 mt-1 justify-center">
-                           {showDice.opponent.usedFocus && <div className="text-[8px] bg-orange-500 text-white px-1.5 py-0.5 rounded uppercase font-black flex items-center shadow-sm"><Zap size={8} className="mr-0.5" />Focus</div>}
-                           {showDice.opponent.usedFatigue && <div className="text-[8px] bg-red-600 text-white px-1.5 py-0.5 rounded uppercase font-black flex items-center shadow-sm"><AlertCircle size={8} className="mr-0.5" />Fatigue</div>}
-                         </motion.div>
-                       )}
-                     </>
-                   ) : (
-                      <div className="animate-pulse flex gap-1 mb-4 h-[64px] items-center justify-center">
-                        {[1,2,3,4,5].map(i => <div key={i} className="w-6 h-6 bg-sumo-beige/50 rounded" />)}
-                      </div>
-                   )}
+                     )}
+                   </div>
                  </div>
               </motion.div>
-            </AnimatePresence>
-          )}
+            )}
+          </AnimatePresence>
         </div>
 
-        {/* Action Text Area */}
-        <div className="w-full flex items-center justify-center text-center mt-2 relative z-10 flex-shrink-0">
-          <AnimatePresence mode="wait">
+        {/* Action Text Area (Anchored below dice) */}
+        <div className="w-full flex-1 flex items-center justify-center text-center mt-auto relative z-10">
+          <AnimatePresence>
             {state.logs.length > 0 && (
               <motion.div 
                 key={state.logs.length}
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="w-full"
+                className="w-full absolute"
               >
-                <p className="text-sm font-serif italic text-sumo-ink font-bold leading-snug px-2">
-                  {state.logs.join(' ')}
+                <p className="text-sm font-serif italic text-sumo-ink font-bold leading-snug px-4">
+                  {state.logs[state.logs.length - 1]}
                 </p>
               </motion.div>
             )}
