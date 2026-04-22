@@ -88,6 +88,36 @@ function generateNPCRikishi(rank: RankInfo, existingNames: Set<string>): Rikishi
   });
 
   const beya = BEYAS[secureRandomInt(BEYAS.length) - 1];
+  const bashosCompleted = 5 + secureRandomInt(80) - 1; // 5 to 84 bashos
+  
+  // Calculate Base Stats for legacy
+  const baseFatigue = Math.floor(bashosCompleted / 2);
+  
+  // Create the record with default clean state first
+  const injuries: Record<AttributeKey, Injury> = {
+    power: { severity: 0, hits: 0 },
+    balance: { severity: 0, hits: 0 },
+    footwork: { severity: 0, hits: 0 },
+    technique: { severity: 0, hits: 0 },
+    spirit: { severity: 0, hits: 0 }
+  };
+  const permanentPenalties: Record<AttributeKey, number> = {
+    power: 0, balance: 0, footwork: 0, technique: 0, spirit: 0
+  };
+
+  // Simulate "Legacy Injuries" for veterans
+  let totalUniqueInjuries = 0;
+  if (bashosCompleted > 20) {
+    const attrs: AttributeKey[] = ['power', 'balance', 'footwork', 'technique', 'spirit'];
+    const rolls = Math.floor(bashosCompleted / 10); // One per ~year
+    for (let i = 0; i < rolls; i++) {
+      if (secureRandom() < 0.2) { // 20% chance of a historical permanent injury per roll
+        const attr = attrs[secureRandomInt(attrs.length) - 1];
+        permanentPenalties[attr] += 1;
+        totalUniqueInjuries += 1;
+      }
+    }
+  }
 
   return {
     id: secureRandomInt(1000000).toString(36) + secureRandomInt(1000000).toString(36),
@@ -101,25 +131,19 @@ function generateNPCRikishi(rank: RankInfo, existingNames: Set<string>): Rikishi
     losses: 0,
     health: 100,
     energy: 100,
-    fatigue: secureRandomInt(30) - 1,
-    baseFatigue: 0,
+    fatigue: secureRandomInt(30) + baseFatigue,
+    baseFatigue,
     focusPoints: 10 + secureRandomInt(30) - 1,
-    bashosCompleted: 5 + secureRandomInt(50) - 1,
-    totalUniqueInjuries: 0,
+    bashosCompleted,
+    totalUniqueInjuries,
     bashoProgressPenalty: 0,
     tpAvailable: 0,
     tpAssigned: { power: 0, balance: 0, footwork: 0, technique: 0, spirit: 0 },
     totalTpSpent: { power: 0, balance: 0, footwork: 0, technique: 0, spirit: 0 },
     momentum: { attribute: null, value: 0 },
     stats,
-    injuries: {
-      power: { severity: 0, hits: 0 },
-      balance: { severity: 0, hits: 0 },
-      footwork: { severity: 0, hits: 0 },
-      technique: { severity: 0, hits: 0 },
-      spirit: { severity: 0, hits: 0 }
-    },
-    permanentPenalties: { power: 0, balance: 0, footwork: 0, technique: 0, spirit: 0 },
+    injuries,
+    permanentPenalties,
     specializations: [],
     hasRenamedAtCurrentRank: false,
     careerHistory: [],

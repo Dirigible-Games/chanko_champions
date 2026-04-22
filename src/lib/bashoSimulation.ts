@@ -1,6 +1,6 @@
-import { WorldState, Rikishi, NewsItem, Division, BoutPairing } from '../types';
+import { WorldState, Rikishi, NewsItem, Division, BoutPairing, AttributeKey } from '../types';
 import { DIVISIONS } from '../constants/world';
-import { getEffectiveStats, secureRandom, secureRandomInt } from './gameLogic';
+import { getEffectiveStats, secureRandom, secureRandomInt, applyInjury, performInjuryRoll, performRecoveryRoll } from './gameLogic';
 import { calculateRankChange, formatRank, abbreviateRank, reRankAllDivisions } from './rankLogic';
 import { calculateMomentumPoints } from './gameLogic';
 
@@ -21,25 +21,39 @@ export function simulateNPCBouts(rikishi: Rikishi, divisionBouts: number, avgDiv
       wins++;
     }
   }
+
   const fatigueGained = secureRandomInt(15) - 1 + (divisionBouts * 2);
   let newFatigue = Math.min(100, rikishi.fatigue + fatigueGained);
-  newFatigue = Math.max(0, newFatigue - 40); 
-  const newFocus = Math.min(40, rikishi.focusPoints + wins); 
+  
+  // Injury Simulation for NPC
+  let currentRikishi = { ...rikishi, fatigue: newFatigue };
+  const injuryResult = performInjuryRoll(currentRikishi.fatigue);
+  if (injuryResult.results.length > 0) {
+    const attrs: AttributeKey[] = ['power', 'balance', 'footwork', 'technique', 'spirit'];
+    injuryResult.results.forEach(res => {
+      const attr = res.attr === 'random' ? attrs[secureRandomInt(attrs.length) - 1] : res.attr;
+      currentRikishi = applyInjury(currentRikishi, res.severity, attr);
+    });
+  }
+
+  newFatigue = Math.max(0, currentRikishi.fatigue - 40); 
+  const newFocus = Math.min(40, currentRikishi.focusPoints + wins); 
   const tpEarned = secureRandomInt(3) - 1 + 2;
-  const newStats = { ...rikishi.stats };
+  const newStats = { ...currentRikishi.stats };
   const attrs: (keyof typeof newStats)[] = ['power', 'balance', 'technique', 'footwork', 'spirit'];
   for (let i = 0; i < tpEarned; i++) {
      const attr = attrs[secureRandomInt(attrs.length) - 1];
      newStats[attr] += 1; 
   }
+
   return {
-    ...rikishi,
+    ...currentRikishi,
     wins,
     losses: divisionBouts - wins,
     fatigue: newFatigue,
     focusPoints: newFocus,
     stats: newStats,
-    bashosCompleted: rikishi.bashosCompleted + 1
+    bashosCompleted: currentRikishi.bashosCompleted + 1
   };
 }
 
@@ -136,7 +150,8 @@ export function simulateBashoEnd(worldState: WorldState, playerRikishi: Rikishi)
   rerankedAll.forEach(r => {
     const divisionInfo = DIVISIONS.find(d => d.name === r.rank.division);
     const bouts = divisionInfo ? divisionInfo.bouts : 15;
-    const oldFormatted = formatRank(rikishiWithRecords.find(orig => orig.id === r.id)!.rank);
+    const origRikishi = rikishiWithRecords.find(orig => orig.id === r.id)!;
+    const oldFormatted = formatRank(origRikishi.rank);
     const newFormatted = formatRank(r.rank);
     const isYusho = r.careerHistory?.length > 0 && 
                     r.careerHistory[r.careerHistory.length - 1].year === worldState.currentYear && 
@@ -149,7 +164,7 @@ export function simulateBashoEnd(worldState: WorldState, playerRikishi: Rikishi)
         {
           year: worldState.currentYear,
           month: worldState.currentMonth.toString(),
-          rank: rikishiWithRecords.find(orig => orig.id === r.id)!.rank, // Use original rank for history
+          rank: origRikishi.rank, // Use original rank for history
           wins: r.wins,
           losses: r.losses,
           isYusho: false,
@@ -170,18 +185,34 @@ export function simulateBashoEnd(worldState: WorldState, playerRikishi: Rikishi)
       }
     }
     
+    // Recovery Phase for ALL rikishi
+    let currentRikishi = { ...r };
+    const { recoveryPoints } = performRecoveryRoll();
+    let remainingPoints = recoveryPoints;
+    
+    const attrKeys: AttributeKey[] = ['power', 'balance', 'footwork', 'technique', 'spirit'];
+    const injuredAttrs = attrKeys.filter(k => currentRikishi.injuries[k].severity > 0);
+    
+    // Simple recovery: distribute points among injuries
+    injuredAttrs.forEach(attr => {
+      if (remainingPoints > 0) {
+        const reduction = Math.min(remainingPoints, currentRikishi.injuries[attr].severity);
+        currentRikishi.injuries[attr].severity -= reduction;
+        remainingPoints -= reduction;
+      }
+    });
+
     // Finalize
     let finalRikishi = {
-      ...r,
+      ...currentRikishi,
       wins: 0,
       losses: 0,
-      fatigue: 0
+      fatigue: currentRikishi.baseFatigue // Reset to baseline
     };
     
     if (r.id === playerRikishi.id) {
-       const origRank = rikishiWithRecords.find(orig => orig.id === r.id)!.rank;
        finalRikishi.momentum.value = calculateMomentumPoints(
-         r, r.wins, r.losses, bouts, origRank, r.rank, isYusho || false, false
+         r, r.wins, r.losses, bouts, origRikishi.rank, r.rank, isYusho || false, false
        );
     }
     finalRikishiList.push(finalRikishi);

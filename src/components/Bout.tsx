@@ -13,7 +13,9 @@ import {
   selectNPCMove,
   decideNPCResources,
   secureRandomInt,
-  secureRandom
+  secureRandom,
+  getBaseInjuryThreshold,
+  getFatigueThresholdReduction
 } from '../lib/gameLogic';
 import { Shield, Swords, Zap, AlertCircle, ChevronRight, Check, Trophy, Award, Info } from 'lucide-react';
 import { AttributeIcon } from './AttributeIcon';
@@ -75,7 +77,8 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
     winnerId: null,
     victoryKimarite: null,
     isMonoii: false,
-    fatigueDieUsed: false
+    fatigueDieUsed: false,
+    hasInjuryTrigger: false
   });
 
   const [phase, setPhase] = useState<'tachiai' | 'stance_selection' | 'combat' | 'result'>('tachiai');
@@ -236,6 +239,15 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
 
     const pRoll = performCombatRoll(playerBaseDie, playerBonus, playerIr);
     const oRoll = performCombatRoll(opponentBaseDie, opponentBonus, opponentIr);
+
+    // Injury Trigger Check
+    const baseThreshold = getBaseInjuryThreshold(rikishi.bashosCompleted);
+    const thresholdReduction = getFatigueThresholdReduction(rikishi.fatigue);
+    const currentThreshold = baseThreshold - thresholdReduction;
+    
+    if (oRoll.total > currentThreshold) {
+      setState(prev => ({ ...prev, hasInjuryTrigger: true }));
+    }
 
     setShowDice({ 
       id: secureRandom().toString(),
@@ -452,6 +464,15 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
     const pRoll = performCombatRoll(playerBaseDie, pBonus + pStatBonus, pIr);
     const oRoll = performCombatRoll(opponentBaseDie, oBonus + oStatBonus, oIr);
 
+    // Injury Trigger Check
+    const baseThreshold = getBaseInjuryThreshold(rikishi.bashosCompleted);
+    const thresholdReduction = getFatigueThresholdReduction(state.fatigue);
+    const currentThreshold = baseThreshold - thresholdReduction;
+    
+    if (oRoll.total > currentThreshold) {
+      setState(prev => ({ ...prev, hasInjuryTrigger: true }));
+    }
+
     setShowDice({ 
       id: secureRandom().toString(),
       player: { ...pRoll, usedFocus: useFocus, usedFatigue: useFatigueDie, maxVal: playerBaseDie + pBonus + pStatBonus, irVal: pIr, moveName: playerMove.name, statBonus: pStatBonus, roundBonus: pBonus, counterVal: pCounterVal, primaryAttr: playerMove.primaryAttr, secondaryAttr: playerMove.secondaryAttr, primaryVal: playerStats[playerMove.primaryAttr], secondaryVal: playerStats[playerMove.secondaryAttr] }, 
@@ -465,7 +486,7 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
       const defenderRoll = isPlayerAttacking ? oRoll.total : pRoll.total;
 
       if (attackerRoll > defenderRoll) {
-        const isMonoiiEligible = isPlayerAttacking && attackerRoll <= defenderRoll + 3;
+        const isMonoiiEligible = attackerRoll <= defenderRoll + 3;
         
         const resolveVictory = () => {
            const winnerId = isPlayerAttacking ? 'player' : 'opponent';
@@ -1060,13 +1081,14 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
                   </p>
                 </div>
                 <div className="pt-4 pb-2 w-full max-w-[280px] mx-auto">
-                  <button
+                   <button
                     onClick={() => onFinish({ 
                       playerWins: state.winnerId === 'player', 
                       victoryKimarite: state.victoryKimarite,
                       fatigueUsed: !!state.fatigueDieUsed,
                       focusSpent: rikishi.focusPoints - state.focusPoints,
-                      finalRound: state.round
+                      finalRound: state.round,
+                      hasInjuryTrigger: state.hasInjuryTrigger
                     })}
                     className="w-full bg-[#362624] text-white py-3.5 rounded-lg font-bold uppercase tracking-[0.15em] text-xs shadow-md shadow-black/20 hover:bg-black active:scale-95 transition-all outline-none"
                   >

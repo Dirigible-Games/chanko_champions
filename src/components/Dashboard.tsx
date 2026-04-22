@@ -59,17 +59,22 @@ export default function Dashboard({ rikishi, onAction }: DashboardProps) {
           <h3 className="text-[7px] font-black uppercase tracking-[0.2em] opacity-30 mb-2 text-center">Attributes</h3>
           <div className="grid grid-cols-5 gap-0.5">
             {[
-              { label: 'power' as AttributeKey, val: effectiveStats.power, base: rikishi.stats.power },
-              { label: 'balance' as AttributeKey, val: effectiveStats.balance, base: rikishi.stats.balance },
-              { label: 'footwork' as AttributeKey, val: effectiveStats.footwork, base: rikishi.stats.footwork},
-              { label: 'technique' as AttributeKey, val: effectiveStats.technique, base: rikishi.stats.technique },
-              { label: 'spirit' as AttributeKey, val: effectiveStats.spirit, base: rikishi.stats.spirit }
+              { label: 'power' as AttributeKey, val: effectiveStats.power, base: rikishi.stats.power, penalty: rikishi.permanentPenalties.power + rikishi.injuries.power.severity },
+              { label: 'balance' as AttributeKey, val: effectiveStats.balance, base: rikishi.stats.balance, penalty: rikishi.permanentPenalties.balance + rikishi.injuries.balance.severity },
+              { label: 'footwork' as AttributeKey, val: effectiveStats.footwork, base: rikishi.stats.footwork, penalty: rikishi.permanentPenalties.footwork + rikishi.injuries.footwork.severity },
+              { label: 'technique' as AttributeKey, val: effectiveStats.technique, base: rikishi.stats.technique, penalty: rikishi.permanentPenalties.technique + rikishi.injuries.technique.severity },
+              { label: 'spirit' as AttributeKey, val: effectiveStats.spirit, base: rikishi.stats.spirit, penalty: rikishi.permanentPenalties.spirit + rikishi.injuries.spirit.severity }
             ].map(s => (
-              <div key={s.label} className="flex flex-col items-center">
+              <div key={s.label} className="flex flex-col items-center relative">
                 <AttributeIcon attr={s.label} size={12} className="mb-0.5 opacity-60" />
                 <span className={`text-xs font-black font-mono ${s.val > s.base ? 'text-sumo-green' : s.val < s.base ? 'text-red-500' : ''}`}>
                   {s.val}
                 </span>
+                {s.penalty > 0 && (
+                  <span className="absolute -top-1 -right-0.5 text-[6px] font-black text-white bg-red-600 px-0.5 rounded-sm scale-75">
+                    -{s.penalty}
+                  </span>
+                )}
               </div>
             ))}
           </div>
@@ -77,9 +82,15 @@ export default function Dashboard({ rikishi, onAction }: DashboardProps) {
 
         {/* Status Negatives Banner - Compacted */}
         {(Object.values(rikishi.injuries).some(i => i.severity > 0) || Object.values(rikishi.permanentPenalties).some(p => p > 0)) && (
-          <div className="bg-red-50 border border-red-100 rounded-xl p-2">
-            <p className="text-[8px] font-bold text-red-700 uppercase tracking-widest flex items-center gap-1.5"><ShieldAlert size={10} /> Active Status Negatives</p>
-          </div>
+          <button 
+            onClick={() => onAction?.('health')}
+            className="w-full text-left bg-red-50 hover:bg-red-100 border border-red-100 rounded-xl p-2 transition-colors active:scale-[0.98]"
+          >
+            <p className="text-[8px] font-bold text-red-700 uppercase tracking-widest flex items-center justify-between">
+              <span className="flex items-center gap-1.5"><ShieldAlert size={10} /> Active Status Negatives</span>
+              <span className="opacity-40">Tap for Details</span>
+            </p>
+          </button>
         )}
 
         {/* Specializations - Compacted */}

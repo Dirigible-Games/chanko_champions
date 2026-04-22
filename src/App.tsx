@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Rikishi, GameView, WorldState, RankInfo } from './types';
+import { AttributeKey, Rikishi, GameView, WorldState, RankInfo } from './types';
 import Header from './components/Header';
 import Navigation from './components/Navigation';
 import { simulateDailyNPCBouts, simulateBashoEnd } from './lib/bashoSimulation';
@@ -12,6 +12,8 @@ import SettingsModal from './components/SettingsModal';
 import BashoSummary from './components/BashoSummary';
 import InterBasho from './components/InterBasho';
 import Bout from './components/Bout';
+import InjuryResolution from './components/InjuryResolution';
+import HealthView from './components/HealthView';
 import WorldBrowser from './components/WorldBrowser';
 import Leaderboard from './components/Leaderboard';
 import { seedWorld } from './lib/worldGeneration';
@@ -19,7 +21,7 @@ import { generateBashoSchedule } from './lib/tournamentScheduler';
 import { formatRank, abbreviateRank } from './lib/rankLogic';
 import { BASHO_NAMES, DIVISIONS } from './constants/world';
 import { Settings } from 'lucide-react';
-import { secureRandomInt } from './lib/gameLogic';
+import { secureRandomInt, performInjuryRoll, applyInjury } from './lib/gameLogic';
 
 export default function App() {
   const [showSettings, setShowSettings] = useState(false);
@@ -38,6 +40,7 @@ export default function App() {
   const [rikishi, setRikishi] = useState<Rikishi | null>(null);
   const [opponent, setOpponent] = useState<Rikishi | null>(null);
   const [oldRank, setOldRank] = useState<RankInfo | null>(null);
+  const [pendingInjuryRikishi, setPendingInjuryRikishi] = useState<Rikishi | null>(null);
 
   // Sync view state to session storage to persist across iframe reloads
   useEffect(() => {
@@ -198,6 +201,9 @@ export default function App() {
           setView('basho');
         }
     }
+    if (action === 'health') {
+      setView('health');
+    }
     // For testing: allow resetting character
     if (action === 'reset') {
       localStorage.removeItem('chanko_world_state');
@@ -213,7 +219,8 @@ export default function App() {
     victoryKimarite: string | null, 
     fatigueUsed: boolean,
     focusSpent: number,
-    finalRound: number
+    finalRound: number,
+    hasInjuryTrigger: boolean
   }) => {
      if (rikishi && worldState) {
         const savedState = localStorage.getItem('chanko_world_state');
@@ -260,10 +267,36 @@ export default function App() {
         };
 
         setWorldState(updatedWorld);
-        setRikishi(updatedPlayer);
         localStorage.setItem('chanko_world_state', JSON.stringify(updatedWorld));
+
+        if (result.hasInjuryTrigger) {
+          setPendingInjuryRikishi(updatedPlayer);
+          setView('injury-resolution');
+        } else {
+          setRikishi(updatedPlayer);
+          if (nextDay > maxDays) {
+            setView('basho-summary');
+          } else {
+            setView('dashboard');
+          }
+        }
      }
-     setView('dashboard');
+  };
+
+  const handleInjuryResolutionComplete = (updated: Rikishi) => {
+    saveRikishi(updated);
+    setPendingInjuryRikishi(null);
+    if (worldState) {
+      const divisionInfo = DIVISIONS.find(d => d.name === updated.rank.division);
+      const maxDays = divisionInfo ? divisionInfo.bouts : 15;
+      if (worldState.currentBashoDay > maxDays) {
+        setView('basho-summary');
+      } else {
+        setView('dashboard');
+      }
+    } else {
+      setView('dashboard');
+    }
   };
 
   return (
@@ -378,6 +411,34 @@ export default function App() {
                       rikishi={rikishi}
                       opponent={opponent}
                       onFinish={handleBoutFinish}
+                    />
+                  </motion.div>
+                )}
+                {view === 'injury-resolution' && pendingInjuryRikishi && (
+                  <motion.div 
+                    key="injury-resolution" 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="w-full h-full"
+                  >
+                    <InjuryResolution 
+                      rikishi={pendingInjuryRikishi} 
+                      onComplete={handleInjuryResolutionComplete} 
+                    />
+                  </motion.div>
+                )}
+                {view === 'health' && rikishi && (
+                  <motion.div 
+                    key="health" 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="w-full h-full"
+                  >
+                    <HealthView 
+                      rikishi={rikishi} 
+                      onBack={() => setView('dashboard')} 
                     />
                   </motion.div>
                 )}

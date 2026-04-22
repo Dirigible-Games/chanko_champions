@@ -69,6 +69,7 @@ export interface BoutState {
   victoryKimarite: string | null;
   isMonoii: boolean;
   fatigueDieUsed: boolean;
+  hasInjuryTrigger: boolean;
 }
 
 export interface Rikishi {
@@ -132,7 +133,7 @@ export interface WorldState {
   currentBashoDay?: number;
 }
 
-export type GameView = 'main-menu' | 'creation' | 'dashboard' | 'news' | 'basho' | 'profile' | 'basho-summary' | 'inter-basho' | 'world' | 'leaderboard';
+export type GameView = 'main-menu' | 'creation' | 'dashboard' | 'news' | 'basho' | 'profile' | 'basho-summary' | 'inter-basho' | 'world' | 'leaderboard' | 'injury-resolution' | 'health';
 
 export const BEYAS = [
   "Ajigawa", "Arashio", "Asahiyama", "Asakayama", "Dewanoumi",

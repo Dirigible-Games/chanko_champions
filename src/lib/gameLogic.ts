@@ -138,28 +138,82 @@ export function secureRandomInt(max: number): number {
 
 /**
  * Performs an injury roll based on current fatigue.
+ * Formula: 3d54 t33 with tier-based modifiers.
  */
-export function performInjuryRoll(fatigue: number): { successes: number, severities: number[], rolls: number[] } {
+export function performInjuryRoll(fatigue: number): { successes: number, results: { attr: AttributeKey | 'random', severity: number }[] } {
   const rolls = Array.from({ length: 3 }, () => secureRandomInt(54));
   const threshold = 33;
-  let successes = rolls.filter(r => r >= threshold).length;
-  let severities: number[] = [];
+  const rawSuccesses = rolls.filter(r => r >= threshold).length;
+  
+  let results: { attr: AttributeKey | 'random', severity: number }[] = [];
 
   if (fatigue < 40) {
-    const rawSuccesses = successes;
-    const finalSeverity = Math.max(0, rawSuccesses - 1);
-    if (finalSeverity > 0) severities = [finalSeverity];
+    // (3d54 t33 - 1), highest severity, same attribute
+    const severity = Math.max(0, rawSuccesses - 1);
+    if (severity > 0) results = [{ attr: 'random', severity }];
   } else if (fatigue < 60) {
-    if (successes > 0) severities = [successes];
+    // (3d54 t33), highest severity, same attribute
+    if (rawSuccesses > 0) results = [{ attr: 'random', severity: rawSuccesses }];
   } else if (fatigue < 80) {
-    severities = Array(successes).fill(1); 
-    severities = Array(successes).fill(1);
+    // (3d54 t33), each success applied, random attribute for each
+    for (let i = 0; i < rawSuccesses; i++) {
+      results.push({ attr: 'random', severity: 1 });
+    }
   } else {
-    successes = 3;
-    severities = rolls.map(r => r >= threshold ? 2 : 1);
+    // (3d54 t33 + 1), each success applied, guaranteed 1 per die, random attribute
+    rolls.forEach(r => {
+      const severity = r >= threshold ? 2 : 1;
+      results.push({ attr: 'random', severity });
+    });
   }
 
-  return { successes, severities, rolls };
+  return { successes: rawSuccesses, results };
+}
+
+/**
+ * Applies an injury to a rikishi, handling severity, hits, base fatigue, and stat minimums.
+ */
+export function applyInjury(rikishi: Rikishi, severity: number, attr: AttributeKey): Rikishi {
+  const newInjuries = { ...rikishi.injuries };
+  const newPermanent = { ...rikishi.permanentPenalties };
+  const injury = { ...newInjuries[attr] };
+  
+  // Each unique injury adds +1 base Fatigue
+  let baseFatigueBonus = 1;
+  
+  // Increase severity (clamped at 3)
+  injury.severity = Math.min(3, injury.severity + severity);
+  
+  // Track "hits" (5 hits = 1 permanent penalty)
+  injury.hits += severity;
+  if (injury.hits >= 5) {
+    const perms = Math.floor(injury.hits / 5);
+    
+    // Applying permanent penalty -1 to stat
+    // Check for stat minimum of 2
+    let remainingPerms = perms;
+    while (remainingPerms > 0) {
+      if (rikishi.stats[attr] - newPermanent[attr] > 2) {
+        newPermanent[attr] += 1;
+      } else {
+        // Stat at 2, overflow adds to base fatigue
+        baseFatigueBonus += 1;
+      }
+      remainingPerms--;
+    }
+    
+    injury.hits = injury.hits % 5;
+  }
+  
+  newInjuries[attr] = injury;
+  
+  return {
+    ...rikishi,
+    injuries: newInjuries,
+    permanentPenalties: newPermanent,
+    baseFatigue: rikishi.baseFatigue + baseFatigueBonus,
+    totalUniqueInjuries: rikishi.totalUniqueInjuries + 1
+  };
 }
 
 /**
