@@ -687,9 +687,9 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
                            </div>
                          </div>
                          <div className="flex gap-1 mt-1.5 h-[14px] items-center justify-center">
-                           {showDice?.opponent.statBonus > 0 && <BonusTooltip label={`+${showDice.opponent.statBonus} Stat`} content="Stat Advantage Bonus" />}
-                           {showDice?.opponent.roundBonus > 0 && <BonusTooltip label={`+${showDice.opponent.roundBonus} Off.`} content="Offense Bonus" />}
-                           {showDice?.opponent.counterVal > 0 && <BonusTooltip label={`+ir${showDice.opponent.counterVal} Ctr.`} content="Counter Bonus" />}
+                           {showDice?.opponent.statBonus > 0 && <BonusTooltip label={`+${showDice.opponent.statBonus} Stat`} content="The two attributes for the chosen technique are added together, and compared to the same attributes for the opponent. If there is a large difference between these sums, a bonus to the max dice value is added. Ex: 5d20 with a +1 stat bonus becomes 5d21." />}
+                           {showDice?.opponent.roundBonus > 0 && <BonusTooltip label={`+${showDice.opponent.roundBonus} Off.`} content="A bonus equal to the current round number is added to the maximum value for each die rolled by the rikishi currently on the offense. Ex: 5d20 on round 6 becomes 5d26." />}
+                           {showDice?.opponent.counterVal > 0 && <BonusTooltip label={`+ir${showDice.opponent.counterVal} Ctr.`} content="When a technique is chosen which counters another technique, the minimum value for each die rolled is boosted to the +IR number." />}
                          </div>
                        </div>
                      )}
