@@ -1,0 +1,41 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Cormorant Garamond", serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-sumo-paper: #FAF7F2;
+  --color-sumo-ink: #3E2723;
+  --color-sumo-dark: #4A3B39;
+  --color-sumo-earth: #D8C7B1;
+  --color-sumo-beige: #E0D4C3;
+  --color-sumo-accent: #8B4513;
+  --color-sumo-green: #5A8D63;
+  --color-sumo-soft: #F2EBE1;
+  --color-sumo-outer: #DCD7C9;
+}
+
+@layer base {
+  body {
+    @apply bg-sumo-outer text-sumo-ink font-sans antialiased;
+    overflow-x: hidden;
+  }
+}
+
+@layer utilities {
+  .clip-dohyo {
+    clip-path: circle(50% at 50% 50%);
+  }
+  
+  .japanese-pattern {
+    background-image: 
+      radial-gradient(circle at 100% 150%, #c2a68a 24%, #f9f7f2 25%, #f9f7f2 28%, #c2a68a 29%, #c2a68a 36%, #f9f7f2 36%, #f9f7f2 40%, rgba(0,0,0,0) 40%),
+      radial-gradient(circle at 0 150%, #c2a68a 24%, #f9f7f2 25%, #f9f7f2 28%, #c2a68a 29%, #c2a68a 36%, #f9f7f2 36%, #f9f7f2 40%, rgba(0,0,0,0) 40%),
+      radial-gradient(circle at 50% 100%, #f9f7f2 10%, #c2a68a 11%, #c2a68a 23%, #f9f7f2 24%, #f9f7f2 30%, #c2a68a 31%, #c2a68a 43%, #f9f7f2 44%, #f9f7f2 50%, #c2a68a 51%, #c2a68a 63%, #f9f7f2 64%, #f9f7f2 71%, #c2a68a 72%, #c2a68a 85%, #f9f7f2 86%, #f9f7f2 100%);
+    background-size: 100px 50px;
+    opacity: 0.05;
+  }
+}
+
