@@ -56,16 +56,20 @@ function getExpectedScore(rikishi: Rikishi): number {
    if (rank.division === 'Jonokuchi') expected = Math.max(350, expected); // Max rank Jonidan 1
 
    // Ozeki promotion check
-   if (['Sekiwake', 'Komusubi'].includes(rank.title as string) || (typeof rank.title === 'number' && rank.title <= 4)) {
+   if (['Sekiwake', 'Komusubi'].includes(rank.title as string) || (typeof rank.title === 'number' && rank.title <= 2)) {
        const past1 = careerHistory[careerHistory.length - 1];
        const past2 = careerHistory[careerHistory.length - 2];
        
        if (past1 && past2) {
            const threeBashoWins = wins + past1.wins + past2.wins;
-           if (threeBashoWins >= 33 && past1.rank.division === 'Makuuchi' && past2.rank.division === 'Makuuchi') {
+           // Must be Kachi-koshi in all three bashos for Ozeki consideration
+           const allKachiKoshi = wins >= 8 && past1.wins >= (past1.wins + past1.losses >= 15 ? 8 : 4) && past2.wins >= (past2.wins + past2.losses >= 15 ? 8 : 4);
+
+           if (threeBashoWins >= 33 && allKachiKoshi && past1.rank.division === 'Makuuchi' && past2.rank.division === 'Makuuchi') {
                return 3; 
            }
        }
+       // Special Ozeki re-instatement (10 wins from Sekiwake after drop)
        if (rank.title === 'Sekiwake' && wins >= 10 && past1 && past1.rank.title === 'Ozeki') {
            return 3;
        }

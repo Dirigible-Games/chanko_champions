@@ -123,9 +123,11 @@ export function simulateBashoEnd(
     divisionAverages.set(d.name, sum / subset.length);
   });
 
-  let currentRikishiList = worldState.rikishi.map((r) =>
-    r.id === playerRikishi.id ? playerRikishi : r,
-  );
+  let currentRikishiList = worldState.rikishi.map((r) => {
+    // Clone rikishi to avoid mutation of world state objects
+    const clone = { ...r, stats: { ...r.stats }, injuries: { ...r.injuries }, permanentPenalties: { ...r.permanentPenalties }, careerHistory: [...(r.careerHistory || [])] };
+    return clone.id === playerRikishi.id ? { ...playerRikishi, careerHistory: [...(playerRikishi.careerHistory || [])] } : clone;
+  });
 
   if (worldState.bashoSchedule) {
     for (let d = worldState.currentBashoDay || 1; d <= 15; d++) {
@@ -138,12 +140,17 @@ export function simulateBashoEnd(
     }
   }
 
+  // Create a record of OLD ranks before re-ranking
+  const oldRanksMap = new Map<string, any>();
+  currentRikishiList.forEach(r => oldRanksMap.set(r.id, { ...r.rank }));
+
   const rikishiWithRecords = currentRikishiList.map((r) => {
-    if (r.id === playerRikishi.id) return playerRikishi;
+    if (r.id === playerRikishi.id) return r;
 
     if (r.isNPC) {
       r.bashosCompleted += 1;
-      const tpEarned = secureRandomInt(3) - 1 + 2;
+      // Slightly toned down stat growth: 1-3 instead of 1-4
+      const tpEarned = secureRandomInt(2) + 1; 
       const attrs: AttributeKey[] = [
         "power",
         "balance",
@@ -199,8 +206,9 @@ export function simulateBashoEnd(
   rerankedAll.forEach((r) => {
     const divisionInfo = DIVISIONS.find((d) => d.name === r.rank.division);
     const bouts = divisionInfo ? divisionInfo.bouts : 15;
-    const origRikishi = rikishiWithRecords.find((orig) => orig.id === r.id)!;
-    const oldFormatted = formatRank(origRikishi.rank);
+    const oldRank = oldRanksMap.get(r.id);
+    
+    const oldFormatted = formatRank(oldRank);
     const newFormatted = formatRank(r.rank);
     const isYusho =
       r.careerHistory?.length > 0 &&
@@ -216,7 +224,7 @@ export function simulateBashoEnd(
         {
           year: worldState.currentYear,
           month: worldState.currentMonth.toString(),
-          rank: origRikishi.rank, // Use original rank for history
+          rank: oldRank, // Use the actual rank they competed at
           wins: r.wins,
           losses: r.losses,
           isYusho: false,
