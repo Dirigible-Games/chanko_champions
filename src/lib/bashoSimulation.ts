@@ -1,6 +1,6 @@
 import { WorldState, Rikishi, NewsItem, Division, BoutPairing } from '../types';
 import { DIVISIONS } from '../constants/world';
-import { getEffectiveStats } from './gameLogic';
+import { getEffectiveStats, secureRandom, secureRandomInt } from './gameLogic';
 import { calculateRankChange, formatRank, abbreviateRank, reRankAllDivisions } from './rankLogic';
 import { calculateMomentumPoints } from './gameLogic';
 
@@ -17,19 +17,19 @@ export function simulateNPCBouts(rikishi: Rikishi, divisionBouts: number, avgDiv
   let winProbability = 0.5 + (powerDiff * 0.025);
   winProbability = Math.max(0.15, Math.min(0.85, winProbability));
   for (let i = 0; i < divisionBouts; i++) {
-    if (Math.random() < winProbability) {
+    if (secureRandom() < winProbability) {
       wins++;
     }
   }
-  const fatigueGained = Math.floor(Math.random() * 15) + (divisionBouts * 2);
+  const fatigueGained = secureRandomInt(15) - 1 + (divisionBouts * 2);
   let newFatigue = Math.min(100, rikishi.fatigue + fatigueGained);
   newFatigue = Math.max(0, newFatigue - 40); 
   const newFocus = Math.min(40, rikishi.focusPoints + wins); 
-  const tpEarned = Math.floor(Math.random() * 3) + 2;
+  const tpEarned = secureRandomInt(3) - 1 + 2;
   const newStats = { ...rikishi.stats };
   const attrs: (keyof typeof newStats)[] = ['power', 'balance', 'technique', 'footwork', 'spirit'];
   for (let i = 0; i < tpEarned; i++) {
-     const attr = attrs[Math.floor(Math.random() * attrs.length)];
+     const attr = attrs[secureRandomInt(attrs.length) - 1];
      newStats[attr] += 1; 
   }
   return {
@@ -61,7 +61,7 @@ export function simulateDailyNPCBouts(rikishi: Rikishi, day: number, bashoSchedu
   const oPower = oppStats.power + oppStats.technique + oppStats.balance + oppStats.spirit + oppStats.footwork;
   
   const winProbability = 0.5 + ((pPower - oPower) * 0.02);
-  const win = Math.random() < winProbability;
+  const win = secureRandom() < winProbability;
 
   return {
     ...rikishi,
@@ -118,7 +118,7 @@ export function simulateBashoEnd(worldState: WorldState, playerRikishi: Rikishi)
       }
     ];
     newsForThisMonth.push({
-      id: Math.random().toString(36).substr(2, 9),
+      id: secureRandomInt(1000000).toString(36),
       year: worldState.currentYear,
       month: worldState.currentMonth,
       type: 'yusho',
@@ -162,11 +162,11 @@ export function simulateBashoEnd(worldState: WorldState, playerRikishi: Rikishi)
       const isDemotion = r.wins < bouts / 2;
       // News logic for promotion
       if (r.rank.title === 'Ozeki' && oldFormatted !== 'Ozeki' && !isDemotion) {
-         newsForThisMonth.push({ id: Math.random().toString(36).substr(2, 9), year: worldState.currentYear, month: worldState.currentMonth, type: 'promotion', text: `${abbreviateRank({division: r.rank.division, title: 'Ozeki', side: r.rank.side})} ${r.name} is promoted to Ozeki!`, rikishiId: r.id });
+         newsForThisMonth.push({ id: secureRandomInt(1000000).toString(36), year: worldState.currentYear, month: worldState.currentMonth, type: 'promotion', text: `${abbreviateRank({division: r.rank.division, title: 'Ozeki', side: r.rank.side})} ${r.name} is promoted to Ozeki!`, rikishiId: r.id });
       }
       // Added Yokozuna promotion news
       if (r.rank.title === 'Yokozuna' && oldFormatted !== 'Yokozuna' && !isDemotion) {
-         newsForThisMonth.push({ id: Math.random().toString(36).substr(2, 9), year: worldState.currentYear, month: worldState.currentMonth, type: 'promotion', text: `${abbreviateRank({division: r.rank.division, title: 'Yokozuna', side: r.rank.side})} ${r.name} has reached the rank of Yokozuna!`, rikishiId: r.id });
+         newsForThisMonth.push({ id: secureRandomInt(1000000).toString(36), year: worldState.currentYear, month: worldState.currentMonth, type: 'promotion', text: `${abbreviateRank({division: r.rank.division, title: 'Yokozuna', side: r.rank.side})} ${r.name} has reached the rank of Yokozuna!`, rikishiId: r.id });
       }
     }
     
@@ -174,7 +174,8 @@ export function simulateBashoEnd(worldState: WorldState, playerRikishi: Rikishi)
     let finalRikishi = {
       ...r,
       wins: 0,
-      losses: 0
+      losses: 0,
+      fatigue: 0
     };
     
     if (r.id === playerRikishi.id) {

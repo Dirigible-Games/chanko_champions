@@ -1,3 +1,5 @@
+import { secureRandom, secureRandomInt } from './gameLogic';
+
 // Romanized sounds representing single Kanji characters
 const CHARS = ["ka", "bu", "ro", "yo", "ta", "fu", "ji", "ryu", "mi", "sa", "to", "chi", "ha", "ku", "no", "ma", "ga", "ze", "ra", "ki", "wa", "so", "fuji", "yama", "kaze", "maru", "sho", "ko", "den"];
 
@@ -28,7 +30,7 @@ export function generateShikona(beya: string, existingNames: Set<string>): strin
     
     // Choose 2-5 parts to make up the name (representing 2-5 Kanji)
     const convention = BEYA_CONVENTIONS[beya];
-    const partCount = Math.floor(Math.random() * 4) + 2; // 2 to 5 parts
+    const partCount = secureRandomInt(4) - 1 + 2; // 2 to 5 parts
     const parts: string[] = [];
     // Track parts used *in this attempt* to avoid repetition
     const usedInName = new Set<string>();
@@ -39,12 +41,12 @@ export function generateShikona(beya: string, existingNames: Set<string>): strin
         
         // Try to find a unique part up to 10 times
         for(let j = 0; j < 10; j++) {
-            if (i === 0 && convention && Math.random() < 0.7) {
-                choice = convention.prefixes?.[Math.floor(Math.random() * convention.prefixes.length)] || CHARS[Math.floor(Math.random() * CHARS.length)];
-            } else if (i === partCount - 1 && convention && Math.random() < 0.7) {
-                choice = convention.suffixes?.[Math.floor(Math.random() * convention.suffixes.length)] || CHARS[Math.floor(Math.random() * CHARS.length)];
+            if (i === 0 && convention && secureRandom() < 0.7) {
+                choice = convention.prefixes?.[secureRandomInt(convention.prefixes.length) - 1] || CHARS[secureRandomInt(CHARS.length) - 1];
+            } else if (i === partCount - 1 && convention && secureRandom() < 0.7) {
+                choice = convention.suffixes?.[secureRandomInt(convention.suffixes.length) - 1] || CHARS[secureRandomInt(CHARS.length) - 1];
             } else {
-                choice = CHARS[Math.floor(Math.random() * CHARS.length)];
+                choice = CHARS[secureRandomInt(CHARS.length) - 1];
             }
 
             if (!usedInName.has(choice)) {
@@ -71,7 +73,7 @@ export function generateShikona(beya: string, existingNames: Set<string>): strin
     return name;
   }
   
-  const fallback = "R" + Math.floor(Math.random() * 1000);
+  const fallback = "R" + (secureRandomInt(1000) - 1);
   existingNames.add(fallback);
   return fallback;
 }

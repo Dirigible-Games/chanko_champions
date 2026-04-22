@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Rikishi, GameView, WorldState } from './types';
+import { Rikishi, GameView, WorldState, RankInfo } from './types';
 import Header from './components/Header';
 import Navigation from './components/Navigation';
-import { simulateDailyNPCBouts } from './lib/bashoSimulation';
+import { simulateDailyNPCBouts, simulateBashoEnd } from './lib/bashoSimulation';
 import Dashboard from './components/Dashboard';
 import NewsView from './components/NewsView';
 import CharacterCreation from './components/CharacterCreation';
@@ -19,6 +19,7 @@ import { generateBashoSchedule } from './lib/tournamentScheduler';
 import { formatRank, abbreviateRank } from './lib/rankLogic';
 import { BASHO_NAMES, DIVISIONS } from './constants/world';
 import { Settings } from 'lucide-react';
+import { secureRandomInt } from './lib/gameLogic';
 
 export default function App() {
   const [showSettings, setShowSettings] = useState(false);
@@ -36,6 +37,7 @@ export default function App() {
   const [worldState, setWorldState] = useState<WorldState | null>(null);
   const [rikishi, setRikishi] = useState<Rikishi | null>(null);
   const [opponent, setOpponent] = useState<Rikishi | null>(null);
+  const [oldRank, setOldRank] = useState<RankInfo | null>(null);
 
   // Sync view state to session storage to persist across iframe reloads
   useEffect(() => {
@@ -103,7 +105,7 @@ export default function App() {
     // For now, just pick any random NPC from the same division if possible
     const sameDiv = worldState.rikishi.filter(r => r.isNPC && r.rank.division === rikishi.rank.division);
     let mockOpp = sameDiv.length > 0 
-      ? sameDiv[Math.floor(Math.random() * sameDiv.length)]
+      ? sameDiv[secureRandomInt(sameDiv.length) - 1]
       : worldState.rikishi.filter(r => r.isNPC)[0];
       
     if (!mockOpp) {
@@ -161,8 +163,12 @@ export default function App() {
     if (action === 'back') setView('dashboard');
     if (action === 'leaderboard') setView('leaderboard');
     if (action === 'end-basho') {
-      if (rikishi) {
-        saveRikishi({ ...rikishi, momentum: { attribute: null, value: 1 } });
+      if (rikishi && worldState) {
+        setOldRank(rikishi.rank);
+        const { updatedWorld, updatedPlayer } = simulateBashoEnd(worldState, rikishi);
+        saveRikishi({ ...updatedPlayer, momentum: { attribute: null, value: 1 } });
+        setWorldState(updatedWorld);
+        localStorage.setItem('chanko_world_state', JSON.stringify(updatedWorld));
       }
       setView('basho-summary');
     }
@@ -202,20 +208,30 @@ export default function App() {
     }
   };
 
-  const handleBoutFinish = (result: { playerWins: boolean, victoryKimarite: string | null, fatigueUsed: boolean }) => {
+  const handleBoutFinish = (result: { 
+    playerWins: boolean, 
+    victoryKimarite: string | null, 
+    fatigueUsed: boolean,
+    focusSpent: number,
+    finalRound: number
+  }) => {
      if (rikishi && worldState) {
         const savedState = localStorage.getItem('chanko_world_state');
         const currentState = savedState ? JSON.parse(savedState) : worldState;
         
         let day = currentState.currentBashoDay || 1;
 
+        // Round penalty: 1% for each round past round 3
+        const roundPenalty = result.finalRound > 3 ? (result.finalRound - 3) : 0;
+
         // Update player
         const updatedPlayer = { 
           ...rikishi, 
           wins: rikishi.wins + (result.playerWins ? 1 : 0),
           losses: rikishi.losses + (result.playerWins ? 0 : 1),
-          focusPoints: Math.min(40, rikishi.focusPoints + (result.playerWins ? 1 : 0)),
-          fatigue: Math.min(100, rikishi.fatigue + (result.fatigueUsed ? 7 : 0))
+          // Correctly deduct focus points
+          focusPoints: Math.max(0, Math.min(40, rikishi.focusPoints - result.focusSpent + (result.playerWins ? 1 : 0))),
+          fatigue: Math.min(100, rikishi.fatigue + (result.fatigueUsed ? 7 : 0) + roundPenalty)
         };
         
         const nextDay = day + 1;
@@ -248,13 +264,6 @@ export default function App() {
         localStorage.setItem('chanko_world_state', JSON.stringify(updatedWorld));
      }
      setView('dashboard');
-  };
-
-  const handleBashoSummaryContinue = (updatedRikishi: Rikishi, updatedWorld: WorldState) => {
-    setWorldState(updatedWorld);
-    setRikishi(updatedRikishi);
-    localStorage.setItem('chanko_world_state', JSON.stringify(updatedWorld));
-    setView('inter-basho');
   };
 
   return (
@@ -304,7 +313,7 @@ export default function App() {
                     />
                   </motion.div>
                 )}
-                {view === 'basho-summary' && (
+                {view === 'basho-summary' && rikishi && (
                   <motion.div
                     key="basho-summary"
                     initial={{ opacity: 0 }}
@@ -314,8 +323,9 @@ export default function App() {
                   >
                      <BashoSummary 
                        rikishi={rikishi} 
+                       oldRank={oldRank || rikishi.rank}
                        worldState={worldState} 
-                       onContinue={handleBashoSummaryContinue}
+                       onContinue={() => setView('inter-basho')}
                      />
                   </motion.div>
                 )}
@@ -417,12 +427,14 @@ export default function App() {
               </AnimatePresence>
             </main>
 
-            {/* Navigation */}
-            <Navigation 
-              currentView={view} 
-              setView={setView} 
-              onSettingsClick={() => setShowSettings(true)} 
-            />
+            {/* Navigation - Hidden during focused gameplay flows */}
+            {!['basho', 'basho-summary', 'inter-basho', 'creation'].includes(view) && (
+              <Navigation 
+                currentView={view} 
+                setView={setView} 
+                onSettingsClick={() => setShowSettings(true)} 
+              />
+            )}
           </>
         ) : (
           <CharacterCreation onComplete={handleCreationComplete} />

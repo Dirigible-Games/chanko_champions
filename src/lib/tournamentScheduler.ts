@@ -1,5 +1,6 @@
 import { Rikishi, BoutPairing, Division } from '../types';
 import { DIVISIONS } from '../constants/world';
+import { secureRandom } from './gameLogic';
 
 export function generateBashoSchedule(allRikishi: Rikishi[]): BoutPairing[] {
   const schedule: BoutPairing[] = [];
@@ -9,7 +10,7 @@ export function generateBashoSchedule(allRikishi: Rikishi[]): BoutPairing[] {
     const rikishiInDiv = allRikishi.filter(r => r.rank.division === divName);
     
     // Simple pairing logic: shuffle and pair
-    const shuffled = [...rikishiInDiv].sort(() => Math.random() - 0.5);
+    const shuffled = [...rikishiInDiv].sort(() => secureRandom() - 0.5);
     const divisionInfo = DIVISIONS.find(d => d.name === divName);
     const totalDays = divisionInfo ? divisionInfo.bouts : 15;
 
@@ -26,7 +27,7 @@ export function generateBashoSchedule(allRikishi: Rikishi[]): BoutPairing[] {
         }
       }
       // Re-shuffle for next day to ensure different opponents
-      shuffled.sort(() => Math.random() - 0.5);
+      shuffled.sort(() => secureRandom() - 0.5);
     }
   });
 

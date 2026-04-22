@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import { Rikishi, WorldState } from '../types';
+import { Rikishi, WorldState, RankInfo } from '../types';
 import { Trophy, ChevronRight, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react';
 import { calculateRankChange, formatRank, abbreviateRank } from '../lib/rankLogic';
 import { simulateBashoEnd } from '../lib/bashoSimulation';
@@ -7,28 +7,30 @@ import { DIVISIONS } from '../constants/world';
 
 interface BashoSummaryProps {
   rikishi: Rikishi;
+  oldRank: RankInfo;
   worldState: WorldState | null;
-  onContinue: (updatedRikishi: Rikishi, updatedWorld: WorldState) => void;
+  onContinue: () => void;
 }
 
-export default function BashoSummary({ rikishi, worldState, onContinue }: BashoSummaryProps) {
+export default function BashoSummary({ rikishi, oldRank, worldState, onContinue }: BashoSummaryProps) {
   if (!worldState) return null;
 
   const divisionInfo = DIVISIONS.find(d => d.name === rikishi.rank.division);
+  // We need to look back at career history to find wins/losses since they were reset by simulation
+  const lastHistory = rikishi.careerHistory[rikishi.careerHistory.length - 1];
+  const wins = lastHistory ? lastHistory.wins : 0;
+  const losses = lastHistory ? lastHistory.losses : 0;
+  
   const totalBouts = divisionInfo ? divisionInfo.bouts : 15;
-  const isKachiKoshi = rikishi.wins > totalBouts / 2;
-  const netWins = rikishi.wins - rikishi.losses;
+  const isKachiKoshi = wins > totalBouts / 2;
+  const netWins = wins - losses;
 
-  const newRank = calculateRankChange(rikishi, rikishi.wins, totalBouts);
-  const rankChanged = formatRank(newRank) !== formatRank(rikishi.rank);
+  const rankChanged = formatRank(rikishi.rank) !== formatRank(oldRank);
   const promoted = rankChanged && netWins > 0;
   const demoted = rankChanged && netWins < 0;
 
   const handleAdvance = () => {
-    // Run global simulation
-    const { updatedWorld, updatedPlayer } = simulateBashoEnd(worldState, rikishi);
-    
-    onContinue(updatedPlayer, updatedWorld);
+    onContinue();
   };
 
   return (
@@ -49,57 +51,73 @@ export default function BashoSummary({ rikishi, worldState, onContinue }: BashoS
         <motion.h1 
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="text-4xl font-serif font-black italic tracking-tight mb-8"
+          className="text-2xl font-serif font-black italic tracking-tight mb-6"
         >
           {isKachiKoshi ? 'KACHI-KOSHI' : 'MAKE-KOSHI'}
         </motion.h1>
 
-        <div className="flex gap-8 items-center bg-white/5 p-4 rounded-2xl backdrop-blur-sm border border-white/10">
+        <div className="flex gap-6 items-center bg-white/5 px-6 py-3 rounded-xl backdrop-blur-sm border border-white/10">
           <div className="text-center">
-             <span className="text-[10px] uppercase font-bold tracking-widest opacity-40 block mb-1">Wins</span>
-             <div className="text-4xl font-mono font-black text-sumo-green">{rikishi.wins}</div>
+             <span className="text-[9px] uppercase font-bold tracking-widest opacity-40 block">Wins</span>
+             <div className="text-2xl font-mono font-black text-sumo-green">{wins}</div>
           </div>
-          <div className="w-px h-10 bg-white/20" />
+          <div className="w-px h-8 bg-white/20" />
           <div className="text-center">
-             <span className="text-[10px] uppercase font-bold tracking-widest opacity-40 block mb-1">Losses</span>
-             <div className="text-4xl font-mono font-black text-red-400">{rikishi.losses}</div>
+             <span className="text-[9px] uppercase font-bold tracking-widest opacity-40 block">Losses</span>
+             <div className="text-2xl font-mono font-black text-red-400">{losses}</div>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 px-6 py-10 overflow-y-auto w-full bg-sumo-paper japanese-pattern-bg">
-        <div className="max-w-xs mx-auto space-y-8">
+      <div className="flex-1 px-6 py-8 overflow-y-auto w-full bg-sumo-paper japanese-pattern-bg">
+        <div className="max-w-sm mx-auto space-y-6">
           <section>
-            <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-sumo-ink/40 mb-6 text-center">Banzuke Performance</h3>
+            <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-sumo-ink/40 mb-4 text-center">Banzuke Performance</h3>
             
-            <div className="bg-white border-2 border-sumo-earth/10 rounded-3xl p-8 shadow-sm flex flex-col items-center text-center relative overflow-hidden">
+            <div className="bg-white border-2 border-sumo-earth/10 rounded-3xl p-6 shadow-sm flex flex-col items-center text-center relative overflow-hidden">
                <div className="absolute top-0 left-0 w-full h-1 bg-sumo-earth/10" />
                
-               <div className="space-y-1 mb-8">
-                 <div className="text-[10px] font-black opacity-30 uppercase tracking-widest">Entry Rank</div>
-                 <div className="text-xl font-serif font-black italic text-sumo-ink/60">{formatRank(rikishi.rank)} <span className="opacity-40 text-sm font-sans not-italic font-bold ml-1">{abbreviateRank(rikishi.rank)}</span></div>
-               </div>
-               
-               <motion.div 
-                 initial={{ scale: 0 }}
-                 animate={{ scale: 1 }}
-                 transition={{ type: "spring", bounce: 0.5, delay: 0.3 }}
-                 className={`w-16 h-16 rounded-full flex items-center justify-center mb-8 shadow-lg border-2 ${
-                   promoted ? 'bg-sumo-green/10 border-sumo-green/20' : 
-                   demoted ? 'bg-red-50 border-red-100' : 
-                   'bg-sumo-beige/10 border-sumo-earth/10'
-                 }`}
-               >
-                 {promoted && <ArrowUpRight size={32} className="text-sumo-green" />}
-                 {demoted && <ArrowDownRight size={32} className="text-red-500" />}
-                 {!promoted && !demoted && <Minus size={32} className="text-sumo-ink/40" />}
-               </motion.div>
-
-               <div className="space-y-1">
-                 <div className="text-[10px] font-black text-sumo-accent uppercase tracking-widest">Current Banzuke</div>
-                 <div className={`text-3xl font-serif font-black italic transition-colors ${promoted ? 'text-sumo-green' : demoted ? 'text-red-600' : 'text-sumo-ink'}`}>
-                   {formatRank(newRank)} <span className="opacity-40 text-lg font-sans not-italic font-bold ml-1">{abbreviateRank(newRank)}</span>
+               <div className="grid grid-cols-2 w-full gap-4 items-center">
+                 <div className="space-y-1">
+                   <div className="text-[9px] font-black opacity-30 uppercase tracking-widest">Entry Rank</div>
+                   <div className="text-lg font-serif font-black italic text-sumo-ink/60">{formatRank(oldRank)}</div>
+                   <div className="text-[10px] font-sans font-bold opacity-40 italic">{abbreviateRank(oldRank)}</div>
                  </div>
+
+                 <div className="flex justify-center">
+                   <motion.div 
+                     initial={{ scale: 0 }}
+                     animate={{ scale: 1 }}
+                     transition={{ type: "spring", bounce: 0.5, delay: 0.3 }}
+                     className={`w-14 h-14 rounded-full flex items-center justify-center shadow-lg border-2 ${
+                       promoted ? 'bg-sumo-green/10 border-sumo-green/20' : 
+                       demoted ? 'bg-red-50 border-red-100' : 
+                       'bg-sumo-beige/10 border-sumo-earth/10'
+                     }`}
+                   >
+                     {promoted && <ArrowUpRight size={28} className="text-sumo-green" />}
+                     {demoted && <ArrowDownRight size={28} className="text-red-500" />}
+                     {!promoted && !demoted && <Minus size={28} className="text-sumo-ink/40" />}
+                   </motion.div>
+                 </div>
+               </div>
+
+               <div className="w-full h-px bg-sumo-beige/30 my-4" />
+
+               <div className="space-y-2 w-full">
+                 <div className="text-[10px] font-black text-sumo-accent uppercase tracking-widest">New Banzuke Status</div>
+                 <div className={`text-4xl font-serif font-black italic transition-colors leading-tight ${promoted ? 'text-sumo-green' : demoted ? 'text-red-600' : 'text-sumo-ink'}`}>
+                   {formatRank(rikishi.rank)}
+                 </div>
+                 <div className="text-lg font-sans not-italic font-black text-sumo-ink/40 tracking-tighter">
+                   {abbreviateRank(rikishi.rank)}
+                 </div>
+                 
+                 {rankChanged && (
+                   <div className={`mt-2 py-1 px-3 rounded-full text-[9px] font-black uppercase tracking-[0.2em] inline-block ${promoted ? 'bg-sumo-green text-white' : 'bg-red-600 text-white'}`}>
+                     {promoted ? 'Promoted' : 'Demoted'}
+                   </div>
+                 )}
                </div>
             </div>
           </section>

@@ -62,6 +62,7 @@ export interface BoutState {
   attackerId: 'player' | 'opponent';
   playerStance: Stance;
   opponentStance: Stance;
+  focusPoints: number;
   logs: string[];
   isFinished: boolean;
   winnerId: 'player' | 'opponent' | null;

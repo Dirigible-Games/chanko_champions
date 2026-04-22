@@ -6,6 +6,7 @@ import { AttributeIcon } from './AttributeIcon';
 import { BonusTooltip } from './BonusTooltip';
 import { ARCHETYPE_DESCRIPTIONS } from '../constants/rikishi';
 import type { AttributeKey } from '../types';
+import { secureRandomInt } from '../lib/gameLogic';
 
 interface CharacterCreationProps {
   onComplete: (rikishi: Rikishi) => void;
@@ -25,6 +26,14 @@ const STAT_LABELS: Record<keyof Omit<RikishiStats, 'weight'>, string> = {
   footwork: 'Footwork',
   technique: 'Technique',
   spirit: 'Spirit',
+};
+
+const STAT_DESCRIPTIONS: Record<keyof Omit<RikishiStats, 'weight'>, string> = {
+  power: 'Strength for pushing and lifting.',
+  balance: 'Steadiness to resist trips and throws.',
+  footwork: 'Speed and positioning ability.',
+  technique: 'Skill with complex technical moves.',
+  spirit: 'Mental stamina and aggressiveness.',
 };
 
 export default function CharacterCreation({ onComplete }: CharacterCreationProps) {
@@ -72,7 +81,7 @@ export default function CharacterCreation({ onComplete }: CharacterCreationProps
     }
 
     const newRikishi: Rikishi = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: secureRandomInt(1000000).toString(36) + secureRandomInt(1000000).toString(36),
       name: name || 'Unlabeled Rikishi',
       rank: { division: 'Jonokuchi', title: 10, side: 'West' }, // Start at bottom
       beya,
@@ -114,13 +123,13 @@ export default function CharacterCreation({ onComplete }: CharacterCreationProps
   return (
     <div className="h-full flex flex-col bg-sumo-paper overflow-hidden">
       {/* Progress Header */}
-      <div className="px-6 pt-10 pb-4">
-        <div className="flex gap-1 mb-4">
+      <div className="px-6 pt-6 pb-2">
+        <div className="flex gap-1 mb-3">
           {[1, 2, 3, 4].map(i => (
             <div key={i} className={`h-1 flex-1 rounded-full ${step >= i ? 'bg-sumo-accent' : 'bg-sumo-beige'}`} />
           ))}
         </div>
-        <h2 className="text-2xl font-serif font-black italic text-sumo-ink uppercase tracking-tighter">
+        <h2 className="text-xl font-serif font-black italic text-sumo-ink uppercase tracking-tighter">
           {step === 1 && "Choose Your Shikona"}
           {step === 2 && "The Stable & Colors"}
           {step === 3 && "Wrestling Style"}
@@ -128,7 +137,7 @@ export default function CharacterCreation({ onComplete }: CharacterCreationProps
         </h2>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-6 no-scrollbar pb-24">
+      <div className="flex-1 overflow-y-auto px-6 no-scrollbar pb-6">
         <AnimatePresence mode="wait">
           {step === 1 && (
             <motion.div
@@ -224,39 +233,63 @@ export default function CharacterCreation({ onComplete }: CharacterCreationProps
               exit={{ opacity: 0, x: -20 }}
               className="space-y-4 pt-4"
             >
-              <div className="grid grid-cols-1 gap-3">
+              <div className="grid grid-cols-2 gap-2">
                 {(['Yotsu', 'Nagete', 'Kakete', 'Tokushuwaza', 'Oshi', 'Custom'] as RikishiArchetype[]).map((arch) => (
-                  <button
+                  <div
                     key={arch}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => setArchetype(arch)}
-                    className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${archetype === arch ? 'border-sumo-accent bg-white shadow-md' : 'border-sumo-beige bg-sumo-soft opacity-60'}`}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setArchetype(arch);
+                      }
+                    }}
+                    className={`w-full text-left p-2 rounded-xl border-2 transition-all cursor-pointer ${archetype === arch ? 'border-sumo-accent bg-white shadow-md' : 'border-sumo-beige bg-white/40 opacity-70 hover:opacity-100'}`}
                   >
-                    <div className="flex justify-between items-center mb-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-black text-sm uppercase tracking-tight">{arch.replace(/([A-Z])/g, ' $1').trim()} Specialist</span>
+                    <div className="flex justify-between items-center mb-0.5">
+                      <div className="flex items-center gap-1 overflow-hidden">
+                        <span className="font-black text-[9px] uppercase tracking-tight truncate">{arch.replace(/([A-Z])/g, ' $1').trim()}</span>
                         <BonusTooltip 
                           title={`${arch.replace(/([A-Z])/g, ' $1').trim()} Style`}
                           content={ARCHETYPE_DESCRIPTIONS[arch]} 
-                          icon={<Info size={12} className="stroke-[3px]" />}
+                          icon={<Info size={9} className="stroke-[3px] shrink-0" />}
                         />
                       </div>
-                      {archetype === arch && <div className="bg-sumo-accent p-0.5 rounded-full text-white"><Check size={12} /></div>}
+                      {archetype === arch && <div className="bg-sumo-accent p-0.5 rounded-full text-white shrink-0"><Check size={7} /></div>}
                     </div>
-                    {arch !== 'Custom' && (
-                      <div className="flex gap-2">
+                    {arch !== 'Custom' ? (
+                      <div className="flex flex-wrap gap-1 mt-1">
                         {Object.entries(ARCHETYPES[arch as keyof typeof ARCHETYPES] || {}).map(([stat, val]) => {
                           if (stat === 'weight') return null;
                           return (
-                            <div key={stat} className="flex flex-col items-center">
-                              <AttributeIcon attr={stat as AttributeKey} size={12} className="mb-0.5 opacity-60" />
-                              <span className="text-[10px] font-black">{val}</span>
+                            <div key={stat} className="flex items-center bg-sumo-beige/10 px-1 rounded">
+                               <AttributeIcon attr={stat as AttributeKey} size={11} className="opacity-80" />
+                               <span className="text-[10px] font-bold ml-1">+{val}</span>
                             </div>
                           );
                         })}
                       </div>
+                    ) : (
+                      <div className="h-[21px]" /> // Spacer to match height
                     )}
-                    {arch === 'Custom' && <p className="text-[10px] font-medium italic opacity-60">Design your own path. 15 points total.</p>}
-                  </button>
+                  </div>
+                ))}
+              </div>
+              
+              {/* Stat Legend */}
+              <div className="mt-6 space-y-2.5 px-1 border-t border-sumo-beige/20 pt-4">
+                {Object.entries(STAT_DESCRIPTIONS).map(([stat, desc]) => (
+                  <div key={stat} className="flex items-center gap-3">
+                    <div className="shrink-0">
+                      <AttributeIcon attr={stat as AttributeKey} size={16} />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-black uppercase tracking-tight text-sumo-ink leading-none">{STAT_LABELS[stat as keyof typeof STAT_DESCRIPTIONS]}</span>
+                      <p className="text-[11px] text-sumo-ink/60 font-medium leading-tight mt-0.5">{desc}</p>
+                    </div>
+                  </div>
                 ))}
               </div>
             </motion.div>

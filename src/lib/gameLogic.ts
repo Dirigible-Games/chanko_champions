@@ -118,10 +118,29 @@ export function getFatigueThresholdReduction(fatigue: number): number {
 }
 
 /**
+ * Securely generates a random decimal between 0 and 1 using Web Crypto API.
+ */
+export function secureRandom(): number {
+  if (typeof window === 'undefined' || !window.crypto) {
+    return Math.random();
+  }
+  const array = new Uint32Array(1);
+  window.crypto.getRandomValues(array);
+  return array[0] / (0xffffffff + 1);
+}
+
+/**
+ * Securely generates a random integer between 1 and max (inclusive) using Web Crypto API.
+ */
+export function secureRandomInt(max: number): number {
+  return Math.floor(secureRandom() * max) + 1;
+}
+
+/**
  * Performs an injury roll based on current fatigue.
  */
 export function performInjuryRoll(fatigue: number): { successes: number, severities: number[], rolls: number[] } {
-  const rolls = Array.from({ length: 3 }, () => Math.floor(Math.random() * 54) + 1);
+  const rolls = Array.from({ length: 3 }, () => secureRandomInt(54));
   const threshold = 33;
   let successes = rolls.filter(r => r >= threshold).length;
   let severities: number[] = [];
@@ -133,17 +152,10 @@ export function performInjuryRoll(fatigue: number): { successes: number, severit
   } else if (fatigue < 60) {
     if (successes > 0) severities = [successes];
   } else if (fatigue < 80) {
-    severities = Array(successes).fill(1); // Not correct, doc says "each successful injury is applied", implying severity is successes or each roll that succeeds adds severity?
-    // "All dice rolled that meet or exceed threshold add +1 severity to that attribute"
-    // At 60-79: "each successful Injury is applied. For each injury attempt, one attribute is selected at random."
-    // This implies if 3 dice succeed, we pick 3 random attributes and add +1 severity to each.
+    severities = Array(successes).fill(1); 
     severities = Array(successes).fill(1);
   } else {
-    // 80%+ severity 1 guaranteed per roll
     successes = 3;
-    severities = rolls.map(r => (r >= threshold ? 2 : 1)); // "+1 is guaranteed for each roll" -> success adds to it? 
-    // Wait: "(3d54 t33 + 1) (AKA a Severity 1 Injury is guaranteed for each roll)"
-    // This means severity starts at 1, and if roll >= 33, it becomes 2.
     severities = rolls.map(r => r >= threshold ? 2 : 1);
   }
 
@@ -157,7 +169,7 @@ export function performTrainingRoll(bashos: number, bonus: number = 0): { succes
   if (bashos >= 20) return { successes: 0, tp: 2, rolls: [] };
   
   const threshold = getTrainingThreshold(bashos);
-  const rolls = Array.from({ length: 4 }, () => Math.floor(Math.random() * 40) + 1);
+  const rolls = Array.from({ length: 4 }, () => secureRandomInt(40));
   const successes = rolls.filter(r => r >= threshold).length;
   const tp = successes + 3 + bonus;
   
@@ -231,7 +243,7 @@ export function calculateMomentumPoints(
 export function performCombatRoll(baseDie: number, bonuses: number = 0, ir: number = 0): { total: number, rolls: number[] } {
   const dieValue = baseDie + bonuses;
   const rolls = Array.from({ length: 5 }, () => {
-    const r = Math.floor(Math.random() * dieValue) + 1;
+    const r = secureRandomInt(dieValue);
     return Math.max(r, ir);
   });
   const total = rolls.reduce((sum, val) => sum + val, 0);
@@ -253,7 +265,7 @@ export function resolveTachiai(playerRoll: number, opponentRoll: number): 'matta
  * Performs Mono-ii if applicable.
  */
 export function performMonoii(): 'attacker' | 'rematch' | 'defender' {
-  const roll = Math.floor(Math.random() * 10) + 1;
+  const roll = secureRandomInt(10);
   if (roll <= 7) return 'attacker';
   if (roll === 8) return 'rematch';
   return 'defender';
@@ -316,8 +328,8 @@ export function selectNPCMove(npc: Rikishi, availableMoves: import('../types').K
 
   for (const move of availableMoves) {
     const statSum = npcStats[move.primaryAttr] + npcStats[move.secondaryAttr];
-    // Add randomness so it isn't literally 100% deterministic, but weights towards strongest moves
-    const score = statSum + (Math.random() * 5);
+    // Add high-quality randomness
+    const score = statSum + (secureRandomInt(500) / 100);
     
     // Check if they have an active specialization for this
     const spec = npc.specializations.find(s => s.kimariteId === move.id);
@@ -359,22 +371,22 @@ export function decideNPCResources(npc: Rikishi, opponent: Rikishi): { useFocus:
   const isMakuuchi = npc.rank.division === 'Makuuchi';
 
   // Base desire to use focus (starts low)
-  let focusProbability = 0.1;
+  let focusProbability = 10; // 10 / 100 
   
   // Context-aware adjustments
-  if (isMakeKoshiDanger) focusProbability += 0.3;     // Desperation
-  if (isKachiKoshiChance) focusProbability += 0.2;    // Achievement
-  if (isYushoThreat) focusProbability += 0.3;         // High stakes
-  if (isSanyakuOpponent) focusProbability += 0.2;     // Tough match
-  if (isMakuuchi) focusProbability += 0.1;            // Elite level
+  if (isMakeKoshiDanger) focusProbability += 30;     // Desperation
+  if (isKachiKoshiChance) focusProbability += 20;    // Achievement
+  if (isYushoThreat) focusProbability += 30;         // High stakes
+  if (isSanyakuOpponent) focusProbability += 20;     // Tough match
+  if (isMakuuchi) focusProbability += 10;            // Elite level
   
-  // Cap probability
-  focusProbability = Math.min(0.8, focusProbability);
+  // Cap probability at 80%
+  focusProbability = Math.min(80, focusProbability);
 
   // Use focus if they can afford it AND pass the context-aware probability check
-  if (npc.focusPoints >= focusCost && Math.random() < focusProbability) {
+  if (npc.focusPoints >= focusCost && secureRandomInt(100) <= focusProbability) {
     useFocus = true;
-  } else if (!isLowerDiv && npc.fatigue < 85 && Math.random() < 0.25) {
+  } else if (!isLowerDiv && npc.fatigue < 85 && secureRandomInt(100) <= 25) {
     // Only use fatigue if focus is not being used to maintain mutual exclusivity
     // AND if not in a lower division
     useFatigue = true;
@@ -387,7 +399,7 @@ export function decideNPCResources(npc: Rikishi, opponent: Rikishi): { useFocus:
  * Performs recovery roll: 2d50 t33 + 1
  */
 export function performRecoveryRoll(): { recoveryPoints: number, rolls: number[] } {
-  const rolls = [Math.floor(Math.random() * 50) + 1, Math.floor(Math.random() * 50) + 1];
+  const rolls = [secureRandomInt(50), secureRandomInt(50)];
   const successes = rolls.filter(r => r >= 33).length;
   return { recoveryPoints: successes + 1, rolls };
 }

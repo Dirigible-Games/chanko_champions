@@ -12,8 +12,9 @@ export function BonusTooltip({ label, content, icon, title, className }: { label
 
   return (
     <>
-      <button 
-        type="button"
+      <span 
+        role="button"
+        tabIndex={0}
         onClick={(e) => { 
           e.stopPropagation(); 
           e.preventDefault();
@@ -22,13 +23,19 @@ export function BonusTooltip({ label, content, icon, title, className }: { label
         onMouseDown={stopAll}
         onPointerDown={stopAll}
         onTouchStart={stopAll}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setIsOpen(true);
+          }
+        }}
         className={className || (label ? 
-          "text-[7.5px] font-mono font-bold text-sumo-ink/50 uppercase tracking-widest cursor-pointer border-b border-sumo-ink/20 border-dotted mt-0.5 tooltip-trigger" : 
-          "tooltip-trigger cursor-pointer opacity-100 hover:scale-110 transition-all p-1.5 text-orange-600 bg-orange-50 border border-orange-200 rounded-full shadow-sm flex items-center justify-center m-0.5")
+          "text-[7.5px] font-mono font-bold text-sumo-ink/50 uppercase tracking-widest cursor-pointer border-b border-sumo-ink/20 border-dotted mt-0.5 tooltip-trigger inline-block" : 
+          "tooltip-trigger cursor-pointer opacity-100 hover:scale-110 transition-all p-1.5 text-orange-600 bg-orange-50 border border-orange-200 rounded-full shadow-sm flex items-center justify-center m-0.5 inline-flex")
         }
       >
         {label || icon}
-      </button>
+      </span>
       {createPortal(
         <AnimatePresence>
           {isOpen && (

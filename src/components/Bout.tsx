@@ -11,7 +11,9 @@ import {
   calculateStatBonus,
   performMonoii,
   selectNPCMove,
-  decideNPCResources
+  decideNPCResources,
+  secureRandomInt,
+  secureRandom
 } from '../lib/gameLogic';
 import { Shield, Swords, Zap, AlertCircle, ChevronRight, Check, Trophy, Award, Info } from 'lucide-react';
 import { AttributeIcon } from './AttributeIcon';
@@ -52,12 +54,19 @@ function getVictoryFlavor(kimarite: string | null, winnerName: string, loserName
 interface BoutProps {
   rikishi: Rikishi;
   opponent: Rikishi; // Mock opponent for now
-  onFinish: (result: { playerWins: boolean, victoryKimarite: string | null, fatigueUsed: boolean }) => void;
+  onFinish: (result: { 
+    playerWins: boolean, 
+    victoryKimarite: string | null, 
+    fatigueUsed: boolean,
+    focusSpent: number,
+    finalRound: number
+  }) => void;
 }
 
 export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
   const [state, setState] = useState<BoutState>({
     round: 1,
+    focusPoints: rikishi.focusPoints,
     attackerId: 'player', // Will be decided after Tachiai
     playerStance: 'Neutral',
     opponentStance: 'Neutral',
@@ -229,7 +238,7 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
     const oRoll = performCombatRoll(opponentBaseDie, opponentBonus, opponentIr);
 
     setShowDice({ 
-      id: Math.random().toString(),
+      id: secureRandom().toString(),
       player: { ...pRoll, usedFocus: useFocus, usedFatigue: useFatigueDie, maxVal: playerBaseDie + playerBonus, irVal: playerIr, moveName: move.name, statBonus: playerBonus, roundBonus: 0, counterVal: pCounterVal, primaryAttr: move.primaryAttr, secondaryAttr: move.secondaryAttr, primaryVal: playerStats[move.primaryAttr], secondaryVal: playerStats[move.secondaryAttr] }, 
       opponent: { ...oRoll, usedFocus: oResources.useFocus, usedFatigue: oUseFatigue, maxVal: opponentBaseDie + opponentBonus, irVal: opponentIr, moveName: opponentMove.name, statBonus: opponentBonus, roundBonus: 0, counterVal: oCounterVal, primaryAttr: opponentMove.primaryAttr, secondaryAttr: opponentMove.secondaryAttr, primaryVal: opponentStats[opponentMove.primaryAttr], secondaryVal: opponentStats[opponentMove.secondaryAttr] } 
     });
@@ -270,7 +279,7 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
           setState(prev => ({ ...prev, round: 2 }));
           setPhase('stance_selection');
         } else {
-          const nextStance = nextStances[Math.floor(Math.random() * nextStances.length)];
+          const nextStance = nextStances[secureRandomInt(nextStances.length) - 1];
           const winnerName = winner === 'player' ? rikishi.name : opponent.name;
           addLog(`${winnerName} transitions into ${nextStance} stance.`);
           
@@ -444,7 +453,7 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
     const oRoll = performCombatRoll(opponentBaseDie, oBonus + oStatBonus, oIr);
 
     setShowDice({ 
-      id: Math.random().toString(),
+      id: secureRandom().toString(),
       player: { ...pRoll, usedFocus: useFocus, usedFatigue: useFatigueDie, maxVal: playerBaseDie + pBonus + pStatBonus, irVal: pIr, moveName: playerMove.name, statBonus: pStatBonus, roundBonus: pBonus, counterVal: pCounterVal, primaryAttr: playerMove.primaryAttr, secondaryAttr: playerMove.secondaryAttr, primaryVal: playerStats[playerMove.primaryAttr], secondaryVal: playerStats[playerMove.secondaryAttr] }, 
       opponent: { ...oRoll, usedFocus: oResources.useFocus, usedFatigue: oUseFatigue, maxVal: opponentBaseDie + oBonus + oStatBonus, irVal: oIr, moveName: opponentMove.name, statBonus: oStatBonus, roundBonus: oBonus, counterVal: oCounterVal, primaryAttr: opponentMove.primaryAttr, secondaryAttr: opponentMove.secondaryAttr, primaryVal: opponentStats[opponentMove.primaryAttr], secondaryVal: opponentStats[opponentMove.secondaryAttr] } 
     });
@@ -521,7 +530,7 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
           setState(prev => ({ ...prev, round: prev.round + 1 }));
           setPhase('stance_selection');
         } else {
-          const nextStance = nextStances[Math.floor(Math.random() * nextStances.length)];
+          const nextStance = nextStances[secureRandomInt(nextStances.length) - 1];
           const defenderName = isPlayerAttacking ? opponent.name : rikishi.name;
           addLog(`${defenderName} transitions into ${nextStance} stance.`);
           
@@ -856,11 +865,11 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
                       {/* Focus button */}
                       <button 
                         onClick={() => { setUseFocus(!useFocus); if (!useFocus) setUseFatigueDie(false); }}
-                        disabled={rikishi.focusPoints < focusCost || isRolling || useFatigueDie}
-                        className={`flex items-center gap-1 transition-all ${useFocus ? 'opacity-100 scale-110' : 'opacity-40 grayscale hover:grayscale-0 hover:opacity-100'} ${rikishi.focusPoints < focusCost ? 'hidden' : ''}`}
+                        disabled={state.focusPoints < focusCost || isRolling || useFatigueDie}
+                        className={`flex items-center gap-1 transition-all ${useFocus ? 'opacity-100 scale-110' : 'opacity-40 grayscale hover:grayscale-0 hover:opacity-100'} ${state.focusPoints < focusCost ? 'opacity-10' : ''}`}
                       >
                         <Zap size={10} className={`${useFocus ? 'text-orange-500 fill-orange-500' : 'text-sumo-ink'}`} />
-                        <span className="text-[9px] font-bold uppercase">Focus</span>
+                        <span className="text-[9px] font-bold uppercase">Focus ({state.focusPoints})</span>
                       </button>
 
                       {/* Fatigue button */}
@@ -968,11 +977,11 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
                       {/* Focus button */}
                       <button 
                         onClick={() => { setUseFocus(!useFocus); if (!useFocus) setUseFatigueDie(false); }}
-                        disabled={rikishi.focusPoints < focusCost || isRolling || useFatigueDie}
-                        className={`flex items-center gap-1 transition-all ${useFocus ? 'opacity-100 scale-110' : 'opacity-40 grayscale hover:grayscale-0 hover:opacity-100'} ${rikishi.focusPoints < focusCost ? 'hidden' : ''}`}
+                        disabled={state.focusPoints < focusCost || isRolling || useFatigueDie}
+                        className={`flex items-center gap-1 transition-all ${useFocus ? 'opacity-100 scale-110' : 'opacity-40 grayscale hover:grayscale-0 hover:opacity-100'} ${state.focusPoints < focusCost ? 'opacity-10' : ''}`}
                       >
                         <Zap size={10} className={`${useFocus ? 'text-orange-500 fill-orange-500' : 'text-sumo-ink'}`} />
-                        <span className="text-[9px] font-bold uppercase">Focus</span>
+                        <span className="text-[9px] font-bold uppercase">Focus ({state.focusPoints})</span>
                       </button>
 
                       {/* Fatigue button */}
@@ -988,7 +997,7 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
                       )}
                    </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2 max-h-[160px] overflow-y-auto no-scrollbar pb-4">
+                <div className="grid grid-cols-2 gap-1.5 overflow-hidden">
                    {(state.attackerId === 'player' ? 
                      OFFENSIVE_MOVES.filter(m => m.stanceRequirement === state.playerStance) : 
                      DEFENSIVE_MOVES
@@ -1055,7 +1064,9 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
                     onClick={() => onFinish({ 
                       playerWins: state.winnerId === 'player', 
                       victoryKimarite: state.victoryKimarite,
-                      fatigueUsed: state.fatigueDieUsed
+                      fatigueUsed: !!state.fatigueDieUsed,
+                      focusSpent: rikishi.focusPoints - state.focusPoints,
+                      finalRound: state.round
                     })}
                     className="w-full bg-[#362624] text-white py-3.5 rounded-lg font-bold uppercase tracking-[0.15em] text-xs shadow-md shadow-black/20 hover:bg-black active:scale-95 transition-all outline-none"
                   >

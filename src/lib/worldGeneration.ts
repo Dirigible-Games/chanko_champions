@@ -2,6 +2,7 @@ import { Rikishi, RankInfo, Division, SanyakuRank, RikishiStats } from '../types
 import { BEYAS } from '../types';
 import { DIVISIONS } from '../constants/world';
 import { generateShikona } from './nameGenerator';
+import { secureRandomInt, secureRandom } from './gameLogic';
 
 /**
  * Seeds the initial world state with ~600 rikishi
@@ -11,8 +12,8 @@ export function seedWorld(): Rikishi[] {
   const existingNames = new Set<string>();
   
   // Use bounds from guidelines for variable sized divisions
-  const jonidanSize = Math.floor(Math.random() * 61) + 200; // 200 - 260
-  const jonokuchiSize = Math.floor(Math.random() * 51) + 50; // 50 - 100
+  const jonidanSize = secureRandomInt(61) - 1 + 200; // 200 - 260
+  const jonokuchiSize = secureRandomInt(51) - 1 + 50; // 50 - 100
   
   const distributions: Record<Division, number> = {
     'Makuuchi': 42,
@@ -61,12 +62,12 @@ export function seedWorld(): Rikishi[] {
 
 function generateNPCRikishi(rank: RankInfo, existingNames: Set<string>): Rikishi {
   const stats: RikishiStats = {
-    power: 3 + Math.floor(Math.random() * 8),
-    balance: 3 + Math.floor(Math.random() * 8),
-    footwork: 3 + Math.floor(Math.random() * 8),
-    technique: 3 + Math.floor(Math.random() * 8),
-    spirit: 3 + Math.floor(Math.random() * 8),
-    weight: 120 + Math.floor(Math.random() * 80)
+    power: 3 + secureRandomInt(8) - 1,
+    balance: 3 + secureRandomInt(8) - 1,
+    footwork: 3 + secureRandomInt(8) - 1,
+    technique: 3 + secureRandomInt(8) - 1,
+    spirit: 3 + secureRandomInt(8) - 1,
+    weight: 120 + secureRandomInt(80) - 1
   };
 
   // Adjust stats based on division
@@ -86,24 +87,24 @@ function generateNPCRikishi(rank: RankInfo, existingNames: Set<string>): Rikishi
     }
   });
 
-  const beya = BEYAS[Math.floor(Math.random() * BEYAS.length)];
+  const beya = BEYAS[secureRandomInt(BEYAS.length) - 1];
 
   return {
-    id: Math.random().toString(36).substr(2, 9),
+    id: secureRandomInt(1000000).toString(36) + secureRandomInt(1000000).toString(36),
     name: generateShikona(beya, existingNames),
     rank,
     beya,
-    mawashiColor: ['Black', 'Blue', 'Green', 'Purple', 'Maroon'][Math.floor(Math.random() * 5)],
+    mawashiColor: ['Black', 'Blue', 'Green', 'Purple', 'Maroon'][secureRandomInt(5) - 1],
     archetype: 'Custom',
-    experience: 5 + Math.floor(Math.random() * 40),
+    experience: 5 + secureRandomInt(40) - 1,
     wins: 0,
     losses: 0,
     health: 100,
     energy: 100,
-    fatigue: Math.floor(Math.random() * 30),
+    fatigue: secureRandomInt(30) - 1,
     baseFatigue: 0,
-    focusPoints: 10 + Math.floor(Math.random() * 30),
-    bashosCompleted: 5 + Math.floor(Math.random() * 50),
+    focusPoints: 10 + secureRandomInt(30) - 1,
+    bashosCompleted: 5 + secureRandomInt(50) - 1,
     totalUniqueInjuries: 0,
     bashoProgressPenalty: 0,
     tpAvailable: 0,
