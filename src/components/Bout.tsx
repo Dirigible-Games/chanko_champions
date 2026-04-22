@@ -79,7 +79,7 @@ function BonusTooltip({ label, content }: { label: string, content: string }) {
                 className="relative bg-white text-sumo-ink p-5 rounded-2xl shadow-xl max-w-[280px] w-full font-sans text-center border-t-4 border-t-red-700"
               >
                 <div className="font-black text-lg mb-2 capitalize tracking-tight">{label.replace('+', '').trim()}</div>
-                <div className="opacity-80 leading-relaxed text-sm">{content.split(': ')[1] || content}</div>
+                <div className="opacity-80 leading-relaxed text-sm">{content}</div>
                 <div className="mt-5 text-[10px] font-black tracking-widest opacity-30 uppercase">Tap anywhere to close</div>
               </motion.div>
             </div>
@@ -613,9 +613,9 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
                            </div>
                          </div>
                          <div className="flex gap-1 mt-1.5 h-[14px] items-center justify-center">
-                           {showDice?.player.statBonus > 0 && <BonusTooltip label={`+${showDice.player.statBonus} Stat`} content="Stat Advantage Bonus" />}
-                           {showDice?.player.roundBonus > 0 && <BonusTooltip label={`+${showDice.player.roundBonus} Off.`} content="Offense Bonus" />}
-                           {showDice?.player.counterVal > 0 && <BonusTooltip label={`+ir${showDice.player.counterVal} Ctr.`} content="Counter Bonus" />}
+                           {showDice?.player.statBonus > 0 && <BonusTooltip label={`+${showDice.player.statBonus} Stat`} content="The two attributes for the chosen technique are added together, and compared to the same attributes for the opponent. If there is a large difference between these sums, a bonus to the max dice value is added. Ex: 5d20 with a +1 stat bonus becomes 5d21." />}
+                           {showDice?.player.roundBonus > 0 && <BonusTooltip label={`+${showDice.player.roundBonus} Off.`} content="A bonus equal to the current round number is added to the maximum value for each die rolled by the rikishi currently on the offense. Ex: 5d20 on round 6 becomes 5d26." />}
+                           {showDice?.player.counterVal > 0 && <BonusTooltip label={`+ir${showDice.player.counterVal} Ctr.`} content="When a technique is chosen which counters another technique, the minimum value for each die rolled is boosted to the +IR number." />}
                          </div>
                        </div>
                      )}
