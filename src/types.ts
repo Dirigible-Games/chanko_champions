@@ -54,6 +54,7 @@ export interface Kimarite {
   stanceRequirement?: Stance;
   transitionsTo?: Stance[]; // For Tachiai and Defense
   counters?: string[]; // IDs it counters
+  description?: string;
 }
 
 export interface BoutState {

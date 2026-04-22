@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Rikishi, BoutState, Kimarite, Stance, AttributeKey } from '../types';
-import { TACHIAI_MOVES, OFFENSIVE_MOVES, DEFENSIVE_MOVES } from '../constants/combat';
+import { TACHIAI_MOVES, OFFENSIVE_MOVES, DEFENSIVE_MOVES, STANCE_DESCRIPTIONS } from '../constants/combat';
 import { 
   performCombatRoll, 
   resolveTachiai, 
@@ -13,8 +13,9 @@ import {
   selectNPCMove,
   decideNPCResources
 } from '../lib/gameLogic';
-import { Shield, Swords, Zap, AlertCircle, ChevronRight, Check, Trophy, Award } from 'lucide-react';
+import { Shield, Swords, Zap, AlertCircle, ChevronRight, Check, Trophy, Award, Info } from 'lucide-react';
 import { AttributeIcon } from './AttributeIcon';
+import { BonusTooltip } from './BonusTooltip';
 import { abbreviateRank } from '../lib/rankLogic';
 
 const VICTORY_DESCRIPTIONS: Record<string, string> = {
@@ -48,49 +49,6 @@ function getVictoryFlavor(kimarite: string | null, winnerName: string, loserName
   return description.replace('{winner}', winnerName).replace('{loser}', loserName);
 }
 
-function BonusTooltip({ label, content }: { label: string, content: string }) {
-  const [isOpen, setIsOpen] = useState(false);
-
-  return (
-    <>
-      <span 
-        onClick={() => setIsOpen(true)}
-        className="text-[7.5px] font-mono font-bold text-sumo-ink/50 uppercase tracking-widest cursor-pointer border-b border-sumo-ink/20 border-dotted mt-0.5"
-      >
-        {label}
-      </span>
-      {createPortal(
-        <AnimatePresence>
-          {isOpen && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-auto">
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.15 }}
-                className="absolute inset-0 bg-sumo-earth/80 backdrop-blur-sm"
-                onClick={() => setIsOpen(false)}
-              />
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                transition={{ duration: 0.2, type: "spring", bounce: 0.4 }}
-                className="relative bg-white text-sumo-ink p-5 rounded-2xl shadow-xl max-w-[280px] w-full font-sans text-center border-t-4 border-t-red-700"
-              >
-                <div className="font-black text-lg mb-2 capitalize tracking-tight">{label.replace('+', '').trim()}</div>
-                <div className="opacity-80 leading-relaxed text-sm">{content}</div>
-                <div className="mt-5 text-[10px] font-black tracking-widest opacity-30 uppercase">Tap anywhere to close</div>
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>,
-        document.body
-      )}
-    </>
-  );
-}
-
 interface BoutProps {
   rikishi: Rikishi;
   opponent: Rikishi; // Mock opponent for now
@@ -112,6 +70,11 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
   });
 
   const [phase, setPhase] = useState<'tachiai' | 'stance_selection' | 'combat' | 'result'>('tachiai');
+  const [animStep, setAnimStep] = useState<'idle' | 'names' | 'stats' | 'bonuses' | 'dice_info' | 'rolling' | 'done'>('idle');
+  const [playerTally, setPlayerTally] = useState(0);
+  const [opponentTally, setOpponentTally] = useState(0);
+  const [diceRevealed, setDiceRevealed] = useState<{player: number, opponent: number}>({player: 0, opponent: 0});
+  
   const [pendingStanceSelection, setPendingStanceSelection] = useState<{
     availableStances: Stance[];
     nextAttackerId: 'player' | 'opponent';
@@ -175,6 +138,12 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
   const executeTachiai = (move: Kimarite) => {
     if (isRolling) return;
     setIsRolling(true);
+    setShowDice(null);
+    setAnimStep('idle');
+    setPlayerTally(0);
+    setOpponentTally(0);
+    setDiceRevealed({ player: 0, opponent: 0 });
+    
     setSelectedMove(move);
     setState(prev => ({ ...prev, logs: [] }));
 
@@ -185,145 +154,205 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
     // NPC Resources
     const oResources = decideNPCResources(opponent, rikishi);
     
+    // Calculate Bonuses Immediately to start the animation sequence
+    // Calculate Bonuses
+    const pMoveSumPlayer = playerStats[move.primaryAttr] + playerStats[move.secondaryAttr];
+    const pMoveSumOpponent = opponentStats[move.primaryAttr] + opponentStats[move.secondaryAttr];
+    const playerBonus = calculateStatBonus(
+      pMoveSumPlayer,
+      pMoveSumOpponent,
+      isElite
+    );
+    
+    const oMoveSumOpponent = opponentStats[opponentMove.primaryAttr] + opponentStats[opponentMove.secondaryAttr];
+    const oMoveSumPlayer = playerStats[opponentMove.primaryAttr] + playerStats[opponentMove.secondaryAttr];
+    const opponentBonus = calculateStatBonus(
+      oMoveSumOpponent,
+      oMoveSumPlayer,
+      opponent.rank.title === 'Ozeki' || opponent.rank.title === 'Yokozuna'
+    );
+
+    // IR Bonuses
+    let playerIr = 0;
+    let opponentIr = 0;
+    let pCounterVal = 0;
+    let oCounterVal = 0;
+
+    // Check Counters
+    if (move.counters?.includes(opponentMove.id)) {
+      playerIr = isElite ? 8 : 6;
+      pCounterVal = playerIr;
+      addLog(`${move.name} counters ${opponentMove.name}!`);
+    }
+    if (opponentMove.counters?.includes(move.id)) {
+      opponentIr = (opponent.rank.title === 'Ozeki' || opponent.rank.title === 'Yokozuna') ? 8 : 6;
+      oCounterVal = opponentIr;
+      addLog(`${opponentMove.name} counters ${move.name}!`);
+    }
+
+    // Check for Specialization
+    const isSpecActive = rikishi.specializations.some(s => s.kimariteId.toLowerCase() === move.id.toLowerCase());
+    if (isSpecActive && !opponentMove.counters?.includes(move.id)) {
+      playerIr = Math.max(playerIr, 4);
+    }
+
+    const oSpecActive = opponent.specializations.some(s => s.kimariteId.toLowerCase() === opponentMove.id.toLowerCase());
+    if (oSpecActive && !move.counters?.includes(opponentMove.id)) {
+      opponentIr = Math.max(opponentIr, 4);
+    }
+
+    // Focus / Fatigue Die
+    if (useFocus) {
+      playerIr = Math.max(playerIr, focusAdd);
+      setState(prev => ({ ...prev, focusPoints: prev.focusPoints - focusCost }));
+      addLog(`Spent ${focusCost} Focus Points for ir${focusAdd}.`);
+    }
+    if (useFatigueDie) {
+      playerIr = Math.max(playerIr, 4);
+      setState(prev => ({ ...prev, fatigueDieUsed: true }));
+      addLog("Using Fatigue Die! +ir4 at the cost of your stamina.");
+    }
+
+    let oUseFatigue = false;
+    if (oResources.useFocus) {
+      const oFocusAdd = (opponent.rank.title === 'Ozeki' || opponent.rank.title === 'Yokozuna') ? 4 : 3;
+      opponentIr = Math.max(opponentIr, oFocusAdd);
+      addLog(`${opponent.name} channels deep focus! (+ir${oFocusAdd})`);
+    }
+    if (oResources.useFatigue) {
+      opponentIr = Math.max(opponentIr, 4);
+      oUseFatigue = true;
+      addLog(`${opponent.name} pushes their stamina to the limit! (+ir4)`);
+    }
+
+    const pRoll = performCombatRoll(playerBaseDie, playerBonus, playerIr);
+    const oRoll = performCombatRoll(opponentBaseDie, opponentBonus, opponentIr);
+
+    setShowDice({ 
+      id: Math.random().toString(),
+      player: { ...pRoll, usedFocus: useFocus, usedFatigue: useFatigueDie, maxVal: playerBaseDie + playerBonus, irVal: playerIr, moveName: move.name, statBonus: playerBonus, roundBonus: 0, counterVal: pCounterVal, primaryAttr: move.primaryAttr, secondaryAttr: move.secondaryAttr, primaryVal: playerStats[move.primaryAttr], secondaryVal: playerStats[move.secondaryAttr] }, 
+      opponent: { ...oRoll, usedFocus: oResources.useFocus, usedFatigue: oUseFatigue, maxVal: opponentBaseDie + opponentBonus, irVal: opponentIr, moveName: opponentMove.name, statBonus: opponentBonus, roundBonus: 0, counterVal: oCounterVal, primaryAttr: opponentMove.primaryAttr, secondaryAttr: opponentMove.secondaryAttr, primaryVal: opponentStats[opponentMove.primaryAttr], secondaryVal: opponentStats[opponentMove.secondaryAttr] } 
+    });
+    
+    const result = resolveTachiai(pRoll.total, oRoll.total);
+
     setTimeout(() => {
-      // Calculate Bonuses
-      const pMoveSumPlayer = playerStats[move.primaryAttr] + playerStats[move.secondaryAttr];
-      const pMoveSumOpponent = opponentStats[move.primaryAttr] + opponentStats[move.secondaryAttr];
-      const playerBonus = calculateStatBonus(
-        pMoveSumPlayer,
-        pMoveSumOpponent,
-        isElite
-      );
-      
-      const oMoveSumOpponent = opponentStats[opponentMove.primaryAttr] + opponentStats[opponentMove.secondaryAttr];
-      const oMoveSumPlayer = playerStats[opponentMove.primaryAttr] + playerStats[opponentMove.secondaryAttr];
-      const opponentBonus = calculateStatBonus(
-        oMoveSumOpponent,
-        oMoveSumPlayer,
-        opponent.rank.title === 'Ozeki' || opponent.rank.title === 'Yokozuna'
-      );
-
-      // IR Bonuses
-      let playerIr = 0;
-      let opponentIr = 0;
-      let pCounterVal = 0;
-      let oCounterVal = 0;
-
-      // Check Counters
-      if (move.counters?.includes(opponentMove.id)) {
-        playerIr = isElite ? 8 : 6;
-        pCounterVal = playerIr;
-        addLog(`${move.name} counters ${opponentMove.name}!`);
-      }
-      if (opponentMove.counters?.includes(move.id)) {
-        opponentIr = (opponent.rank.title === 'Ozeki' || opponent.rank.title === 'Yokozuna') ? 8 : 6;
-        oCounterVal = opponentIr;
-        addLog(`${opponentMove.name} counters ${move.name}!`);
-      }
-
-      // Check for Specialization (Tachiai usually doesn't have spec, but following rule)
-      const isSpecActive = rikishi.specializations.some(s => s.kimariteId.toLowerCase() === move.id.toLowerCase());
-      if (isSpecActive && !opponentMove.counters?.includes(move.id)) {
-        playerIr = Math.max(playerIr, 4);
-      }
-
-      const oSpecActive = opponent.specializations.some(s => s.kimariteId.toLowerCase() === opponentMove.id.toLowerCase());
-      if (oSpecActive && !move.counters?.includes(opponentMove.id)) {
-        opponentIr = Math.max(opponentIr, 4);
-      }
-
-      // Focus / Fatigue Die
-      if (useFocus) {
-        playerIr = Math.max(playerIr, focusAdd);
-        setState(prev => ({ ...prev, focusPoints: prev.focusPoints - focusCost }));
-        addLog(`Spent ${focusCost} Focus Points for ir${focusAdd}.`);
-      }
-      if (useFatigueDie) {
-        playerIr = Math.max(playerIr, 4);
-        setState(prev => ({ ...prev, fatigueDieUsed: true }));
-        addLog("Using Fatigue Die! +ir4 at the cost of your stamina.");
-      }
-
-      let oUseFatigue = false;
-      if (oResources.useFocus) {
-        const oFocusAdd = (opponent.rank.title === 'Ozeki' || opponent.rank.title === 'Yokozuna') ? 4 : 3;
-        opponentIr = Math.max(opponentIr, oFocusAdd);
-        addLog(`${opponent.name} channels deep focus! (+ir${oFocusAdd})`);
-      }
-      if (oResources.useFatigue) {
-        opponentIr = Math.max(opponentIr, 4);
-        oUseFatigue = true;
-        addLog(`${opponent.name} pushes their stamina to the limit! (+ir4)`);
-      }
-
-      const pRoll = performCombatRoll(playerBaseDie, playerBonus, playerIr);
-      const oRoll = performCombatRoll(opponentBaseDie, opponentBonus, opponentIr);
-
-      setShowDice({ 
-        id: Math.random().toString(),
-        player: { ...pRoll, usedFocus: useFocus, usedFatigue: useFatigueDie, maxVal: playerBaseDie + playerBonus, irVal: playerIr, moveName: move.name, statBonus: playerBonus, roundBonus: 0, counterVal: pCounterVal, primaryAttr: move.primaryAttr, secondaryAttr: move.secondaryAttr, primaryVal: playerStats[move.primaryAttr], secondaryVal: playerStats[move.secondaryAttr] }, 
-        opponent: { ...oRoll, usedFocus: oResources.useFocus, usedFatigue: oUseFatigue, maxVal: opponentBaseDie + opponentBonus, irVal: opponentIr, moveName: opponentMove.name, statBonus: opponentBonus, roundBonus: 0, counterVal: oCounterVal, primaryAttr: opponentMove.primaryAttr, secondaryAttr: opponentMove.secondaryAttr, primaryVal: opponentStats[opponentMove.primaryAttr], secondaryVal: opponentStats[opponentMove.secondaryAttr] } 
-      });
-      
-      const result = resolveTachiai(pRoll.total, oRoll.total);
-
-      setTimeout(() => {
-        setUseFocus(false);
-        setUseFatigueDie(false);
-        if (result === 'matta') {
-          addLog('MATTA! A false start! The rikishi reset...');
+      setUseFocus(false);
+      setUseFatigueDie(false);
+      if (result === 'matta') {
+        addLog('MATTA! A false start! The rikishi reset...');
+        setIsRolling(false);
+        setSelectedMove(null);
+        setOpponentMove(null);
+        setShowDice(null);
+      } else if (result.includes('critical')) {
+        const winner = result === 'player_critical' ? 'player' : 'opponent';
+        setState(prev => ({
+          ...prev,
+          isFinished: true,
+          winnerId: winner,
+          victoryKimarite: winner === 'player' ? move.name : opponentMove.name,
+          logs: [...prev.logs, `${winner === 'player' ? rikishi.name : opponent.name} wins by CRITICAL TACHIAI!`]
+        }));
+        setPhase('result');
+      } else {
+        const winner = result === 'player_win' ? 'player' : 'opponent';
+        const winnerMove = winner === 'player' ? move : opponentMove;
+        const nextStances = winnerMove.transitionsTo || ['Neutral'];
+        
+        addLog(`${winner === 'player' ? rikishi.name : opponent.name} wins the Tachiai!`);
+        
+        if (winner === 'player' && nextStances.length > 1) {
+          setPendingStanceSelection({
+            availableStances: nextStances,
+            nextAttackerId: 'player'
+          });
+          setState(prev => ({ ...prev, round: 2 }));
+          setPhase('stance_selection');
+        } else {
+          const nextStance = nextStances[Math.floor(Math.random() * nextStances.length)];
+          const winnerName = winner === 'player' ? rikishi.name : opponent.name;
+          addLog(`${winnerName} transitions into ${nextStance} stance.`);
+          
+          setState(prev => ({
+            ...prev,
+            attackerId: winner,
+            playerStance: winner === 'player' ? nextStance : 'Neutral',
+            opponentStance: winner === 'opponent' ? nextStance : 'Neutral',
+            round: 2
+          }));
+          setPhase('combat');
           setIsRolling(false);
           setSelectedMove(null);
           setOpponentMove(null);
-        } else if (result.includes('critical')) {
-          const winner = result === 'player_critical' ? 'player' : 'opponent';
-          setState(prev => ({
-            ...prev,
-            isFinished: true,
-            winnerId: winner,
-            victoryKimarite: winner === 'player' ? move.name : opponentMove.name,
-            logs: [...prev.logs, `${winner === 'player' ? rikishi.name : opponent.name} wins by CRITICAL TACHIAI!`]
-          }));
-          setPhase('result');
-        } else {
-          const winner = result === 'player_win' ? 'player' : 'opponent';
-          const winnerMove = winner === 'player' ? move : opponentMove;
-          const nextStances = winnerMove.transitionsTo || ['Neutral'];
-          
-          addLog(`${winner === 'player' ? rikishi.name : opponent.name} wins the Tachiai!`);
-          
-          if (winner === 'player' && nextStances.length > 1) {
-            setPendingStanceSelection({
-              availableStances: nextStances,
-              nextAttackerId: 'player'
-            });
-            setState(prev => ({ ...prev, round: 2 }));
-            setPhase('stance_selection');
-          } else {
-            const nextStance = nextStances[Math.floor(Math.random() * nextStances.length)];
-            const winnerName = winner === 'player' ? rikishi.name : opponent.name;
-            addLog(`${winnerName} transitions into ${nextStance} stance.`);
-            
-            setState(prev => ({
-              ...prev,
-              attackerId: winner,
-              playerStance: winner === 'player' ? nextStance : 'Neutral',
-              opponentStance: winner === 'opponent' ? nextStance : 'Neutral',
-              round: 2
-            }));
-            setPhase('combat');
-            setIsRolling(false);
-            setSelectedMove(null);
-            setOpponentMove(null);
-          }
+          setShowDice(null);
         }
-      }, 4500); // Wait for the sequenced dice animation (Player 5 -> total, Opponent 5 -> total)
-    }, 500);
+      }
+    }, 8500); // Wait for the sequence
   };
+
+  // Combat Animation Sequence
+  useEffect(() => {
+    if (showDice) {
+      setAnimStep('names');
+      const timer1 = setTimeout(() => setAnimStep('stats'), 800);
+      const timer2 = setTimeout(() => setAnimStep('bonuses'), 1600);
+      const timer3 = setTimeout(() => setAnimStep('dice_info'), 2400);
+      const timer4 = setTimeout(() => setAnimStep('rolling'), 3200);
+      
+      return () => {
+        clearTimeout(timer1);
+        clearTimeout(timer2);
+        clearTimeout(timer3);
+        clearTimeout(timer4);
+      };
+    } else {
+      setAnimStep('idle');
+      setPlayerTally(0);
+      setOpponentTally(0);
+      setDiceRevealed({ player: 0, opponent: 0 });
+    }
+  }, [showDice]);
+
+  // Dice Reveal Tally Logic
+  useEffect(() => {
+    if (animStep === 'rolling' && showDice) {
+      // Player Dice Sequence
+      const pTimers = showDice.player.rolls.map((val, i) => {
+        return setTimeout(() => {
+          setDiceRevealed(prev => ({ ...prev, player: i + 1 }));
+          setPlayerTally(prev => prev + val);
+        }, i * 400);
+      });
+
+      // Opponent Dice Sequence
+      const oStartDelay = showDice.player.rolls.length * 400 + 400; // Slight gap after player
+      const oTimers = showDice.opponent.rolls.map((val, i) => {
+        return setTimeout(() => {
+          setDiceRevealed(prev => ({ ...prev, opponent: i + 1 }));
+          setOpponentTally(prev => prev + val);
+          if (i === showDice.opponent.rolls.length - 1) {
+            setAnimStep('done');
+          }
+        }, oStartDelay + (i * 400));
+      });
+
+      return () => {
+        pTimers.forEach(t => clearTimeout(t));
+        oTimers.forEach(t => clearTimeout(t));
+      };
+    }
+  }, [animStep, showDice]);
 
   const executeCombatRound = (playerMove: Kimarite) => {
     if (isRolling) return;
     setIsRolling(true);
+    setShowDice(null);
+    setAnimStep('idle');
+    setPlayerTally(0);
+    setOpponentTally(0);
+    setDiceRevealed({ player: 0, opponent: 0 });
+    
     setSelectedMove(playerMove);
     setState(prev => ({ ...prev, logs: [] }));
 
@@ -341,180 +370,175 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
     const oResources = decideNPCResources(opponent, rikishi);
     setOpponentMove(opponentMove);
 
-    setTimeout(() => {
-      const roundBonus = state.round;
-      
-      const pMoveSumPlayer = playerStats[playerMove.primaryAttr] + playerStats[playerMove.secondaryAttr];
-      const pMoveSumOpponent = opponentStats[playerMove.primaryAttr] + opponentStats[playerMove.secondaryAttr];
-      
-      const oMoveSumOpponent = opponentStats[opponentMove.primaryAttr] + opponentStats[opponentMove.secondaryAttr];
-      const oMoveSumPlayer = playerStats[opponentMove.primaryAttr] + playerStats[opponentMove.secondaryAttr];
+    // Calculate Bonuses Immediately to start the animation sequence
+    const roundBonus = state.round;
+    
+    const pMoveSumPlayer = playerStats[playerMove.primaryAttr] + playerStats[playerMove.secondaryAttr];
+    const pMoveSumOpponent = opponentStats[playerMove.primaryAttr] + opponentStats[playerMove.secondaryAttr];
+    
+    const oMoveSumOpponent = opponentStats[opponentMove.primaryAttr] + opponentStats[opponentMove.secondaryAttr];
+    const oMoveSumPlayer = playerStats[opponentMove.primaryAttr] + playerStats[opponentMove.secondaryAttr];
 
-      const pBonus = isPlayerAttacking ? roundBonus : 0;
-      const oBonus = !isPlayerAttacking ? roundBonus : 0;
-      
-      const pStatBonus = calculateStatBonus(pMoveSumPlayer, pMoveSumOpponent, isElite);
-      const oStatBonus = calculateStatBonus(oMoveSumOpponent, oMoveSumPlayer, opponent.rank.title === 'Ozeki' || opponent.rank.title === 'Yokozuna');
+    const pBonus = isPlayerAttacking ? roundBonus : 0;
+    const oBonus = !isPlayerAttacking ? roundBonus : 0;
+    
+    const pStatBonus = calculateStatBonus(pMoveSumPlayer, pMoveSumOpponent, isElite);
+    const oStatBonus = calculateStatBonus(oMoveSumOpponent, oMoveSumPlayer, opponent.rank.title === 'Ozeki' || opponent.rank.title === 'Yokozuna');
 
-      let pIr = 0;
-      let oIr = 0;
-      let pCounterVal = 0;
-      let oCounterVal = 0;
+    let pIr = 0;
+    let oIr = 0;
+    let pCounterVal = 0;
+    let oCounterVal = 0;
 
-      if (playerMove.counters?.includes(opponentMove.id)) {
-        pIr = isElite ? 8 : 6;
-        pCounterVal = pIr;
-        addLog(`${playerMove.name} counters ${opponentMove.name}!`);
-      }
-      if (opponentMove.counters?.includes(playerMove.id)) {
-        oIr = (opponent.rank.title === 'Ozeki' || opponent.rank.title === 'Yokozuna') ? 8 : 6;
-        oCounterVal = oIr;
-        addLog(`${opponentMove.name} counters ${playerMove.name}!`);
-      }
+    if (playerMove.counters?.includes(opponentMove.id)) {
+      pIr = isElite ? 8 : 6;
+      pCounterVal = pIr;
+      addLog(`${playerMove.name} counters ${opponentMove.name}!`);
+    }
+    if (opponentMove.counters?.includes(playerMove.id)) {
+      oIr = (opponent.rank.title === 'Ozeki' || opponent.rank.title === 'Yokozuna') ? 8 : 6;
+      oCounterVal = oIr;
+      addLog(`${opponentMove.name} counters ${playerMove.name}!`);
+    }
 
-      const isSpecActive = rikishi.specializations.some(s => s.kimariteId.toLowerCase() === playerMove.id.toLowerCase());
-      if (isSpecActive && !opponentMove.counters?.includes(playerMove.id)) {
-        // Specialization checks current stats: logic should check if specialization is ACTIVE
-        // But doc says "+ir4 when using that specific kimarite"
-        // And "if rikishi gets injured... specialization becomes inactive".
-        // My getEffectiveStats already handles injury penalties. 
-        // I should verify if effective stats meet 8/5.
-        const spec = rikishi.specializations.find(s => s.kimariteId.toLowerCase() === playerMove.id.toLowerCase());
-        if (spec && playerStats[spec.primaryAttr] >= 8 && playerStats[spec.secondaryAttr] >= 5) {
-          pIr = Math.max(pIr, 4);
-          addLog("SPECIALIZATION BONUS ACTIVE (+ir4)");
-        }
-      }
-
-      const oSpec = opponent.specializations?.find(s => s.kimariteId.toLowerCase() === opponentMove.id.toLowerCase());
-      if (oSpec && !playerMove.counters?.includes(opponentMove.id)) {
-        if (opponentStats[oSpec.primaryAttr] >= 8 && opponentStats[oSpec.secondaryAttr] >= 5) {
-          oIr = Math.max(oIr, 4);
-        }
-      }
-
-      if (useFocus) {
-        pIr = Math.max(pIr, focusAdd);
-        setState(prev => ({ ...prev, focusPoints: prev.focusPoints - focusCost }));
-        addLog(`Focus Die used (+ir${focusAdd})`);
-      }
-      if (useFatigueDie) {
+    const isSpecActive = rikishi.specializations.some(s => s.kimariteId.toLowerCase() === playerMove.id.toLowerCase());
+    if (isSpecActive && !opponentMove.counters?.includes(playerMove.id)) {
+      const spec = rikishi.specializations.find(s => s.kimariteId.toLowerCase() === playerMove.id.toLowerCase());
+      if (spec && playerStats[spec.primaryAttr] >= 8 && playerStats[spec.secondaryAttr] >= 5) {
         pIr = Math.max(pIr, 4);
-        setState(prev => ({ ...prev, fatigueDieUsed: true }));
-        addLog("Fatigue Die used (+ir4)");
+        addLog("SPECIALIZATION BONUS ACTIVE (+ir4)");
       }
+    }
 
-      let oUseFatigue = false;
-      if (oResources.useFocus) {
-        const oFocusAdd = (opponent.rank.title === 'Ozeki' || opponent.rank.title === 'Yokozuna') ? 4 : 3;
-        oIr = Math.max(oIr, oFocusAdd);
-        addLog(`${opponent.name} focuses their attacks! (+ir${oFocusAdd})`);
-      }
-      if (oResources.useFatigue) {
+    const oSpec = opponent.specializations?.find(s => s.kimariteId.toLowerCase() === opponentMove.id.toLowerCase());
+    if (oSpec && !playerMove.counters?.includes(opponentMove.id)) {
+      if (opponentStats[oSpec.primaryAttr] >= 8 && opponentStats[oSpec.secondaryAttr] >= 5) {
         oIr = Math.max(oIr, 4);
-        oUseFatigue = true;
-        addLog(`${opponent.name} burns stamina pushing the attack! (+ir4)`);
       }
+    }
 
-      const pRoll = performCombatRoll(playerBaseDie, pBonus + pStatBonus, pIr);
-      const oRoll = performCombatRoll(opponentBaseDie, oBonus + oStatBonus, oIr);
+    if (useFocus) {
+      pIr = Math.max(pIr, focusAdd);
+      setState(prev => ({ ...prev, focusPoints: prev.focusPoints - focusCost }));
+      addLog(`Focus Die used (+ir${focusAdd})`);
+    }
+    if (useFatigueDie) {
+      pIr = Math.max(pIr, 4);
+      setState(prev => ({ ...prev, fatigueDieUsed: true }));
+      addLog("Fatigue Die used (+ir4)");
+    }
 
-      setShowDice({ 
-        id: Math.random().toString(),
-        player: { ...pRoll, usedFocus: useFocus, usedFatigue: useFatigueDie, maxVal: playerBaseDie + pBonus + pStatBonus, irVal: pIr, moveName: playerMove.name, statBonus: pStatBonus, roundBonus: pBonus, counterVal: pCounterVal, primaryAttr: playerMove.primaryAttr, secondaryAttr: playerMove.secondaryAttr, primaryVal: playerStats[playerMove.primaryAttr], secondaryVal: playerStats[playerMove.secondaryAttr] }, 
-        opponent: { ...oRoll, usedFocus: oResources.useFocus, usedFatigue: oUseFatigue, maxVal: opponentBaseDie + oBonus + oStatBonus, irVal: oIr, moveName: opponentMove.name, statBonus: oStatBonus, roundBonus: oBonus, counterVal: oCounterVal, primaryAttr: opponentMove.primaryAttr, secondaryAttr: opponentMove.secondaryAttr, primaryVal: opponentStats[opponentMove.primaryAttr], secondaryVal: opponentStats[opponentMove.secondaryAttr] } 
-      });
+    let oUseFatigue = false;
+    if (oResources.useFocus) {
+      const oFocusAdd = (opponent.rank.title === 'Ozeki' || opponent.rank.title === 'Yokozuna') ? 4 : 3;
+      oIr = Math.max(oIr, oFocusAdd);
+      addLog(`${opponent.name} focuses their attacks! (+ir${oFocusAdd})`);
+    }
+    if (oResources.useFatigue) {
+      oIr = Math.max(oIr, 4);
+      oUseFatigue = true;
+      addLog(`${opponent.name} burns stamina pushing the attack! (+ir4)`);
+    }
 
-      setTimeout(() => {
-        setUseFocus(false);
-        setUseFatigueDie(false);
-        const attackerRoll = isPlayerAttacking ? pRoll.total : oRoll.total;
-        const defenderRoll = isPlayerAttacking ? oRoll.total : pRoll.total;
+    const pRoll = performCombatRoll(playerBaseDie, pBonus + pStatBonus, pIr);
+    const oRoll = performCombatRoll(opponentBaseDie, oBonus + oStatBonus, oIr);
 
-        if (attackerRoll > defenderRoll) {
-          const isMonoiiEligible = isPlayerAttacking && attackerRoll <= defenderRoll + 3;
-          
-          const resolveVictory = () => {
-             const winnerId = isPlayerAttacking ? 'player' : 'opponent';
-             setState(prev => ({
-               ...prev,
-               isFinished: true,
-               winnerId,
-               victoryKimarite: isPlayerAttacking ? playerMove.name : opponentMove.name,
-               logs: [...prev.logs, `${winnerId === 'player' ? rikishi.name : opponent.name} wins by ${isPlayerAttacking ? playerMove.name : opponentMove.name}!`]
-             }));
-             setPhase('result');
-          };
+    setShowDice({ 
+      id: Math.random().toString(),
+      player: { ...pRoll, usedFocus: useFocus, usedFatigue: useFatigueDie, maxVal: playerBaseDie + pBonus + pStatBonus, irVal: pIr, moveName: playerMove.name, statBonus: pStatBonus, roundBonus: pBonus, counterVal: pCounterVal, primaryAttr: playerMove.primaryAttr, secondaryAttr: playerMove.secondaryAttr, primaryVal: playerStats[playerMove.primaryAttr], secondaryVal: playerStats[playerMove.secondaryAttr] }, 
+      opponent: { ...oRoll, usedFocus: oResources.useFocus, usedFatigue: oUseFatigue, maxVal: opponentBaseDie + oBonus + oStatBonus, irVal: oIr, moveName: opponentMove.name, statBonus: oStatBonus, roundBonus: oBonus, counterVal: oCounterVal, primaryAttr: opponentMove.primaryAttr, secondaryAttr: opponentMove.secondaryAttr, primaryVal: opponentStats[opponentMove.primaryAttr], secondaryVal: opponentStats[opponentMove.secondaryAttr] } 
+    });
 
-          if (isMonoiiEligible) {
-            addLog("MONO-II!");
-            const monoiiResult = performMonoii();
-            if (monoiiResult === 'attacker') {
-              addLog("Ruling stands.");
-              resolveVictory();
-            } else if (monoiiResult === 'rematch') {
-              addLog("TORINAOSHI!");
-              setState(prev => ({ ...prev, round: prev.round + 1 }));
-              setPhase('tachiai');
-              setIsRolling(false);
-              setSelectedMove(null);
-              setOpponentMove(null);
-            } else {
-              addLog("Ruling reversed!");
-              const winnerId = 'opponent';
-               setState(prev => ({
-               ...prev,
-               isFinished: true,
-               winnerId,
-               victoryKimarite: 'Sashichigae',
-               logs: [...prev.logs, `${opponent.name} wins by reversal!`]
-             }));
-             setPhase('result');
-            }
-          } else {
+    setTimeout(() => {
+      setUseFocus(false);
+      setUseFatigueDie(false);
+      const attackerRoll = isPlayerAttacking ? pRoll.total : oRoll.total;
+      const defenderRoll = isPlayerAttacking ? oRoll.total : pRoll.total;
+
+      if (attackerRoll > defenderRoll) {
+        const isMonoiiEligible = isPlayerAttacking && attackerRoll <= defenderRoll + 3;
+        
+        const resolveVictory = () => {
+           const winnerId = isPlayerAttacking ? 'player' : 'opponent';
+           setState(prev => ({
+             ...prev,
+             isFinished: true,
+             winnerId,
+             victoryKimarite: isPlayerAttacking ? playerMove.name : opponentMove.name,
+             logs: [...prev.logs, `${winnerId === 'player' ? rikishi.name : opponent.name} wins by ${isPlayerAttacking ? playerMove.name : opponentMove.name}!`]
+           }));
+           setPhase('result');
+        };
+
+        if (isMonoiiEligible) {
+          addLog("MONO-II!");
+          const monoiiResult = performMonoii();
+          if (monoiiResult === 'attacker') {
+            addLog("Ruling stands.");
             resolveVictory();
-          }
-        } else {
-          // Defender logic
-          const dRoll = isPlayerAttacking ? oRoll.total : pRoll.total;
-          const aRoll = isPlayerAttacking ? pRoll.total : oRoll.total;
-          
-          if (dRoll >= aRoll + 50) {
-             addLog("CRITICAL DEFENSE! Defender earns momentum for next round (+4).");
-             // Add bonus logic for next round if needed
-          }
-
-          const defenderMove = isPlayerAttacking ? opponentMove : playerMove;
-          const nextStances = defenderMove.transitionsTo || ['Neutral'];
-          
-          addLog(`${isPlayerAttacking ? opponent.name : rikishi.name} defends with ${defenderMove.name}!`);
-          
-          if (!isPlayerAttacking && nextStances.length > 1) {
-            setPendingStanceSelection({
-              availableStances: nextStances,
-              nextAttackerId: 'player'
-            });
+          } else if (monoiiResult === 'rematch') {
+            addLog("TORINAOSHI!");
             setState(prev => ({ ...prev, round: prev.round + 1 }));
-            setPhase('stance_selection');
-          } else {
-            const nextStance = nextStances[Math.floor(Math.random() * nextStances.length)];
-            const defenderName = isPlayerAttacking ? opponent.name : rikishi.name;
-            addLog(`${defenderName} transitions into ${nextStance} stance.`);
-            
-            setState(prev => ({
-              ...prev,
-              attackerId: prev.attackerId === 'player' ? 'opponent' : 'player',
-              playerStance: isPlayerAttacking ? 'Neutral' : nextStance,
-              opponentStance: isPlayerAttacking ? nextStance : 'Neutral',
-              round: prev.round + 1
-            }));
+            setPhase('tachiai');
             setIsRolling(false);
             setSelectedMove(null);
             setOpponentMove(null);
+            setShowDice(null);
+          } else {
+            addLog("Ruling reversed!");
+            const winnerId = 'opponent';
+             setState(prev => ({
+             ...prev,
+             isFinished: true,
+             winnerId,
+             victoryKimarite: 'Sashichigae',
+             logs: [...prev.logs, `${opponent.name} wins by reversal!`]
+           }));
+           setPhase('result');
           }
+        } else {
+          resolveVictory();
         }
-      }, 4500); // 4500ms timeout to wait for the staggered sequential dice UI animation to fully complete
-    }, 500);
+      } else {
+        // Defender logic
+        const dRoll = isPlayerAttacking ? oRoll.total : pRoll.total;
+        const aRoll = isPlayerAttacking ? pRoll.total : oRoll.total;
+        
+        if (dRoll >= aRoll + 50) {
+           addLog("CRITICAL DEFENSE! Defender earns momentum for next round (+4).");
+        }
+
+        const defenderMove = isPlayerAttacking ? opponentMove : playerMove;
+        const nextStances = defenderMove.transitionsTo || ['Neutral'];
+        
+        addLog(`${isPlayerAttacking ? opponent.name : rikishi.name} defends with ${defenderMove.name}!`);
+        
+        if (!isPlayerAttacking && nextStances.length > 1) {
+          setPendingStanceSelection({
+            availableStances: nextStances,
+            nextAttackerId: 'player'
+          });
+          setState(prev => ({ ...prev, round: prev.round + 1 }));
+          setPhase('stance_selection');
+        } else {
+          const nextStance = nextStances[Math.floor(Math.random() * nextStances.length)];
+          const defenderName = isPlayerAttacking ? opponent.name : rikishi.name;
+          addLog(`${defenderName} transitions into ${nextStance} stance.`);
+          
+          setState(prev => ({
+            ...prev,
+            attackerId: prev.attackerId === 'player' ? 'opponent' : 'player',
+            playerStance: isPlayerAttacking ? 'Neutral' : nextStance,
+            opponentStance: isPlayerAttacking ? nextStance : 'Neutral',
+            round: prev.round + 1
+          }));
+          setIsRolling(false);
+          setSelectedMove(null);
+          setOpponentMove(null);
+          setShowDice(null);
+        }
+      }
+    }, 8500); // 8500ms timeout to wait for the sequence
   };
 
   return (
@@ -579,164 +603,222 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
         <div className="absolute inset-0 bg-[url('/clay-texture.png')] opacity-5 pointer-events-none" />
         
         {/* Dice Area (Fixed Height Stage) */}
-        <div className="w-full flex-shrink-0 h-[200px] mb-4 relative flex items-center justify-center">
-          <AnimatePresence>
-            {(isRolling || showDice) && (
-              <motion.div 
-                key="dice-stage"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="flex gap-4 justify-center items-center py-4 bg-white/90 rounded-2xl border border-sumo-earth/30 w-full max-w-sm z-10 shadow-md px-4 h-full"
-              >
-                 {/* Player Side */}
-                 <div className="text-center flex flex-col items-center flex-1 h-full">
-                   <div className="h-[75px] w-full flex flex-col items-center justify-start">
-                     <p className="text-[9px] font-black uppercase tracking-widest opacity-40 mb-1 text-sumo-ink">You</p>
-                     {(showDice || selectedMove) && (
-                       <div className="flex flex-col items-center w-full">
-                         <div className="text-sm font-black text-sumo-ink leading-tight text-center truncate w-full">
-                           {showDice?.player.moveName || selectedMove?.name}
-                         </div>
-                         <div className="flex gap-2 mt-1 justify-center items-center h-[14px]">
-                           <div className="flex items-center gap-1">
-                             <AttributeIcon attr={showDice?.player.primaryAttr || selectedMove?.primaryAttr} size={10}/>
-                             <span className="text-[10px] font-mono font-bold leading-none text-sumo-ink">
-                               {showDice?.player.primaryVal || (selectedMove && playerStats[selectedMove.primaryAttr]) || '-'}
-                             </span>
-                           </div>
-                           <div className="flex items-center gap-1">
-                             <AttributeIcon attr={showDice?.player.secondaryAttr || selectedMove?.secondaryAttr} size={10}/>
-                             <span className="text-[10px] font-mono font-bold leading-none text-sumo-ink">
-                               {showDice?.player.secondaryVal || (selectedMove && playerStats[selectedMove.secondaryAttr]) || '-'}
-                             </span>
-                           </div>
-                         </div>
-                         <div className="flex gap-1 mt-1.5 h-[14px] items-center justify-center">
-                           {showDice?.player.statBonus > 0 && <BonusTooltip label={`+${showDice.player.statBonus} Stat`} content="The two attributes for the chosen technique are added together, and compared to the same attributes for the opponent. If there is a large difference between these sums, a bonus to the max dice value is added. Ex: 5d20 with a +1 stat bonus becomes 5d21." />}
-                           {showDice?.player.roundBonus > 0 && <BonusTooltip label={`+${showDice.player.roundBonus} Off.`} content="A bonus equal to the current round number is added to the maximum value for each die rolled by the rikishi currently on the offense. Ex: 5d20 on round 6 becomes 5d26." />}
-                           {showDice?.player.counterVal > 0 && <BonusTooltip label={`+ir${showDice.player.counterVal} Ctr.`} content="When a technique is chosen which counters another technique, the minimum value for each die rolled is boosted to the +IR number." />}
-                         </div>
-                       </div>
-                     )}
-                   </div>
-                   
-                   <div className="h-[30px] flex items-center justify-center w-full">
-                     {showDice ? (
-                       <div className="flex gap-0.5 justify-center w-full">
-                         {showDice.player.rolls.map((d: number, i: number) => (
-                           <motion.div 
-                             key={`${showDice.id}-p-${i}`} 
-                             initial={{ opacity: 0, y: -10, rotateX: 180 }}
-                             animate={{ opacity: 1, y: 0, rotateX: 0, backgroundColor: ["#ffffff", getFlashColor(d, showDice.player.maxVal, "#1a1a1a"), "#1a1a1a"] }}
-                             transition={{ 
-                               duration: 0.4, 
-                               delay: i * 0.2, 
-                               type: "spring",
-                               backgroundColor: { type: "tween", duration: 0.6, delay: i * 0.2 }
-                             }}
-                             className="w-5 h-5 text-white rounded text-[9px] flex items-center justify-center font-mono font-bold shadow-sm"
-                           >
-                             {d}
-                           </motion.div>
-                         ))}
-                       </div>
-                     ) : (
-                       <div className="animate-pulse flex gap-1 items-center justify-center">
-                         {[1,2,3,4,5].map(i => <div key={i} className="w-5 h-5 bg-sumo-beige/40 rounded shadow-inner" />)}
-                       </div>
-                     )}
-                   </div>
-
-                   <div className="h-[45px] flex flex-col items-center justify-center mt-auto">
-                     {showDice && (
+        <div className="w-full flex-shrink-0 h-[220px] mb-4 relative flex items-center justify-center">
+          <div className="flex gap-4 justify-center items-center py-4 bg-white/90 rounded-2xl border border-sumo-earth/30 w-full max-w-sm z-10 shadow-md px-4 h-full">
+             {/* Player Side */}
+             <div className="text-center flex flex-col items-center flex-1 h-full">
+                <p className="text-[9px] font-black uppercase tracking-widest opacity-40 mb-1 text-sumo-ink">You</p>
+                
+                <div className="h-[75px] w-full flex flex-col items-center justify-start overflow-hidden">
+                   <AnimatePresence>
+                     {animStep !== 'idle' && (
                        <motion.div 
-                         initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 1.2 }}
-                         className="flex flex-col items-center"
+                         initial={{ opacity: 0, y: 10 }}
+                         animate={{ opacity: 1, y: 0 }}
+                         className="flex flex-col items-center w-full"
                        >
-                         <span className="text-xl font-serif italic font-black text-sumo-ink leading-none">{showDice.player.total}</span>
-                         <span className="text-[8px] font-bold opacity-40 mt-0.5">(5d{showDice.player.maxVal}{showDice.player.irVal > 0 ? ` ir${showDice.player.irVal}` : ''})</span>
+                         {/* Name - Step: names */}
+                         <motion.div 
+                           className="text-sm font-black text-sumo-ink leading-tight text-center truncate w-full h-5"
+                           initial={{ opacity: 0 }}
+                           animate={{ opacity: ['names', 'stats', 'bonuses', 'dice_info', 'rolling', 'done'].includes(animStep) ? 1 : 0 }}
+                         >
+                            {showDice?.player.moveName || selectedMove?.name}
+                         </motion.div>
+                         
+                         {/* Stats - Step: stats */}
+                         <motion.div 
+                           initial={{ opacity: 0 }}
+                           animate={{ opacity: ['stats', 'bonuses', 'dice_info', 'rolling', 'done'].includes(animStep) ? 1 : 0 }}
+                           className="flex gap-2 mt-1 justify-center items-center h-[14px]"
+                         >
+                            <div className="flex items-center gap-1">
+                              <AttributeIcon attr={showDice?.player.primaryAttr || selectedMove?.primaryAttr} size={10}/>
+                              <span className="text-[10px] font-mono font-bold leading-none text-sumo-ink">
+                                {showDice?.player.primaryVal || (selectedMove && playerStats[selectedMove.primaryAttr]) || '-'}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <AttributeIcon attr={showDice?.player.secondaryAttr || selectedMove?.secondaryAttr} size={10}/>
+                              <span className="text-[10px] font-mono font-bold leading-none text-sumo-ink">
+                                {showDice?.player.secondaryVal || (selectedMove && playerStats[selectedMove.secondaryAttr]) || '-'}
+                              </span>
+                            </div>
+                         </motion.div>
+
+                         {/* Bonuses - Step: bonuses */}
+                         <motion.div 
+                           initial={{ opacity: 0 }}
+                           animate={{ opacity: ['bonuses', 'dice_info', 'rolling', 'done'].includes(animStep) ? 1 : 0 }}
+                           className="flex gap-1 mt-1.5 h-[14px] items-center justify-center opacity-0 animate-in fade-in fill-mode-forwards"
+                         >
+                            {showDice?.player.statBonus > 0 && <BonusTooltip label={`+${showDice.player.statBonus} Stat`} content="The two attributes for the chosen technique are added together, and compared to the same attributes for the opponent. If there is a large difference between these sums, a bonus to the max dice value is added. Ex: 5d20 with a +1 stat bonus becomes 5d21." />}
+                            {showDice?.player.roundBonus > 0 && <BonusTooltip label={`+${showDice.player.roundBonus} Off.`} content="A bonus equal to the current round number is added to the maximum value for each die rolled by the rikishi currently on the offense. Ex: 5d20 on round 6 becomes 5d26." />}
+                            {showDice?.player.counterVal > 0 && <BonusTooltip label={`+ir${showDice.player.counterVal} Ctr.`} content="When a technique is chosen which counters another technique, the minimum value for each die rolled is boosted to the +IR number." />}
+                         </motion.div>
                        </motion.div>
                      )}
-                   </div>
-                 </div>
-                 
-                 <div className="text-xl font-black italic opacity-20 text-sumo-ink px-2">VS</div>
-                 
-                 {/* Enemy Side */}
-                 <div className="text-center flex flex-col items-center flex-1 h-full">
-                   <div className="h-[75px] w-full flex flex-col items-center justify-start">
-                     <p className="text-[9px] font-black uppercase tracking-widest opacity-40 mb-1 text-sumo-ink">Enemy</p>
-                     {(showDice || opponentMove) && (
-                       <div className="flex flex-col items-center w-full">
-                         <div className="text-sm font-black text-sumo-ink leading-tight text-center truncate w-full">
-                           {showDice?.opponent.moveName || opponentMove?.name}
-                         </div>
-                         <div className="flex gap-2 mt-1 justify-center items-center h-[14px]">
-                           <div className="flex items-center gap-1">
-                             <AttributeIcon attr={showDice?.opponent.primaryAttr || opponentMove?.primaryAttr} size={10}/>
-                             <span className="text-[10px] font-mono font-bold leading-none text-sumo-ink">
-                               {showDice?.opponent.primaryVal || (opponentMove && opponentStats[opponentMove.primaryAttr]) || '-'}
-                             </span>
-                           </div>
-                           <div className="flex items-center gap-1">
-                             <AttributeIcon attr={showDice?.opponent.secondaryAttr || opponentMove?.secondaryAttr} size={10}/>
-                             <span className="text-[10px] font-mono font-bold leading-none text-sumo-ink">
-                               {showDice?.opponent.secondaryVal || (opponentMove && opponentStats[opponentMove.secondaryAttr]) || '-'}
-                             </span>
-                           </div>
-                         </div>
-                         <div className="flex gap-1 mt-1.5 h-[14px] items-center justify-center">
-                           {showDice?.opponent.statBonus > 0 && <BonusTooltip label={`+${showDice.opponent.statBonus} Stat`} content="The two attributes for the chosen technique are added together, and compared to the same attributes for the opponent. If there is a large difference between these sums, a bonus to the max dice value is added. Ex: 5d20 with a +1 stat bonus becomes 5d21." />}
-                           {showDice?.opponent.roundBonus > 0 && <BonusTooltip label={`+${showDice.opponent.roundBonus} Off.`} content="A bonus equal to the current round number is added to the maximum value for each die rolled by the rikishi currently on the offense. Ex: 5d20 on round 6 becomes 5d26." />}
-                           {showDice?.opponent.counterVal > 0 && <BonusTooltip label={`+ir${showDice.opponent.counterVal} Ctr.`} content="When a technique is chosen which counters another technique, the minimum value for each die rolled is boosted to the +IR number." />}
-                         </div>
-                       </div>
-                     )}
-                   </div>
-                   
-                   <div className="h-[30px] flex items-center justify-center w-full">
-                     {showDice ? (
-                       <div className="flex gap-0.5 justify-center w-full">
-                         {showDice.opponent.rolls.map((d: number, i: number) => (
-                           <motion.div 
-                             key={`${showDice.id}-o-${i}`} 
-                             initial={{ opacity: 0, y: -10, rotateX: 180 }}
-                             animate={{ opacity: 1, y: 0, rotateX: 0, backgroundColor: ["#ffffff", getFlashColor(d, showDice.opponent.maxVal, "#991b1b"), "#991b1b"] }} 
-                             transition={{ 
-                               duration: 0.4, 
-                               delay: 1.5 + (i * 0.2), 
-                               type: "spring",
-                               backgroundColor: { type: "tween", duration: 0.6, delay: 1.5 + (i * 0.2) }
-                             }}
-                             className="w-5 h-5 text-white rounded text-[9px] flex items-center justify-center font-mono font-bold shadow-sm"
-                           >
-                             {d}
-                           </motion.div>
-                         ))}
-                       </div>
-                     ) : (
-                       <div className="animate-pulse flex gap-1 items-center justify-center">
-                         {[1,2,3,4,5].map(i => <div key={i} className="w-5 h-5 bg-sumo-beige/40 rounded shadow-inner" />)}
-                       </div>
-                     )}
-                   </div>
+                   </AnimatePresence>
+                </div>
 
-                   <div className="h-[45px] flex flex-col items-center justify-center mt-auto">
-                     {showDice && (
-                       <motion.div 
-                         initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 2.7 }}
-                         className="flex flex-col items-center"
+                {/* Recessed Dice Slots */}
+                <div className="h-[30px] flex items-center justify-center w-full">
+                  <div className="flex gap-1 justify-center w-full">
+                    {[0, 1, 2, 3, 4].map((i) => (
+                      <div key={`p-slot-${i}`} className="relative w-5 h-5">
+                        <div className="absolute inset-0 bg-sumo-earth/10 rounded shadow-inner border border-sumo-earth/5" />
+                        {diceRevealed.player > i && showDice && (
+                          <motion.div 
+                            initial={{ opacity: 0, scale: 0.5, rotateX: 180 }}
+                            animate={{ 
+                              opacity: 1, 
+                              scale: 1, 
+                              rotateX: 0, 
+                              backgroundColor: ["#ffffff", getFlashColor(showDice.player.rolls[i], showDice.player.maxVal, "#1a1a1a"), "#1a1a1a"] 
+                            }}
+                            transition={{ duration: 0.3 }}
+                            className="absolute inset-0 text-white rounded text-[9px] flex items-center justify-center font-mono font-bold shadow-sm z-10"
+                          >
+                            {showDice.player.rolls[i]}
+                          </motion.div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Dice Info & Tally */}
+                <div className="h-[55px] flex flex-col items-center justify-end">
+                   <AnimatePresence>
+                     {['dice_info', 'rolling', 'done'].includes(animStep) && showDice && (
+                       <motion.div
+                         initial={{ opacity: 0, y: -5 }} 
+                         animate={{ opacity: 1, y: 0 }}
+                         className="flex flex-col items-center w-full"
                        >
-                         <span className="text-xl font-serif italic font-black text-red-800 leading-none">{showDice.opponent.total}</span>
-                         <span className="text-[8px] font-bold opacity-40 mt-0.5 tracking-tighter text-red-800/80">(5d{showDice.opponent.maxVal}{showDice.opponent.irVal > 0 ? ` ir${showDice.opponent.irVal}` : ''})</span>
+                         {/* Dice Info - visible from dice_info step */}
+                         <div className="text-[8px] font-bold opacity-40 mb-1 whitespace-nowrap">
+                            (5d{showDice.player.maxVal}{showDice.player.irVal > 0 ? ` ir${showDice.player.irVal}` : ''})
+                         </div>
+
+                         {/* Tally - visible from rolling step */}
+                         <div className="text-xl font-serif italic font-black text-sumo-ink leading-none h-6 flex items-center justify-center">
+                            {['rolling', 'done'].includes(animStep) ? playerTally : ''}
+                         </div>
                        </motion.div>
                      )}
-                   </div>
-                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                   </AnimatePresence>
+                </div>
+             </div>
+             
+             <div className="text-xl font-black italic opacity-20 text-sumo-ink px-2 shrink-0">VS</div>
+             
+             {/* Enemy Side */}
+             <div className="text-center flex flex-col items-center flex-1 h-full">
+                <p className="text-[9px] font-black uppercase tracking-widest opacity-40 mb-1 text-sumo-ink">Enemy</p>
+                
+                <div className="h-[75px] w-full flex flex-col items-center justify-start overflow-hidden">
+                   <AnimatePresence>
+                     {animStep !== 'idle' && (
+                       <motion.div 
+                         initial={{ opacity: 0, y: 10 }}
+                         animate={{ opacity: 1, y: 0 }}
+                         className="flex flex-col items-center w-full"
+                       >
+                         {/* Name */}
+                         <motion.div 
+                           className="text-sm font-black text-sumo-ink leading-tight text-center truncate w-full h-5"
+                           initial={{ opacity: 0 }}
+                           animate={{ opacity: ['names', 'stats', 'bonuses', 'dice_info', 'rolling', 'done'].includes(animStep) ? 1 : 0 }}
+                         >
+                            {showDice?.opponent.moveName || opponentMove?.name}
+                         </motion.div>
+                         
+                         {/* Stats */}
+                         <motion.div 
+                           initial={{ opacity: 0 }}
+                           animate={{ opacity: ['stats', 'bonuses', 'dice_info', 'rolling', 'done'].includes(animStep) ? 1 : 0 }}
+                           className="flex gap-2 mt-1 justify-center items-center h-[14px]"
+                         >
+                            <div className="flex items-center gap-1">
+                              <AttributeIcon attr={showDice?.opponent.primaryAttr || opponentMove?.primaryAttr} size={10}/>
+                              <span className="text-[10px] font-mono font-bold leading-none text-sumo-ink">
+                                {showDice?.opponent.primaryVal || (opponentMove && opponentStats[opponentMove.primaryAttr]) || '-'}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <AttributeIcon attr={showDice?.opponent.secondaryAttr || opponentMove?.secondaryAttr} size={10}/>
+                              <span className="text-[10px] font-mono font-bold leading-none text-sumo-ink">
+                                {showDice?.opponent.secondaryVal || (opponentMove && opponentStats[opponentMove.secondaryAttr]) || '-'}
+                              </span>
+                            </div>
+                         </motion.div>
+
+                         {/* Bonuses */}
+                         <motion.div 
+                           initial={{ opacity: 0 }}
+                           animate={{ opacity: ['bonuses', 'dice_info', 'rolling', 'done'].includes(animStep) ? 1 : 0 }}
+                           className="flex gap-1 mt-1.5 h-[14px] items-center justify-center opacity-0 animate-in fade-in fill-mode-forwards"
+                         >
+                            {showDice?.opponent.statBonus > 0 && <BonusTooltip label={`+${showDice.opponent.statBonus} Stat`} content="The two attributes for the chosen technique are added together, and compared to the same attributes for the opponent. If there is a large difference between these sums, a bonus to the max dice value is added. Ex: 5d20 with a +1 stat bonus becomes 5d21." />}
+                            {showDice?.opponent.roundBonus > 0 && <BonusTooltip label={`+${showDice.opponent.roundBonus} Off.`} content="A bonus equal to the current round number is added to the maximum value for each die rolled by the rikishi currently on the offense. Ex: 5d20 on round 6 becomes 5d26." />}
+                            {showDice?.opponent.counterVal > 0 && <BonusTooltip label={`+ir${showDice.opponent.counterVal} Ctr.`} content="When a technique is chosen which counters another technique, the minimum value for each die rolled is boosted to the +IR number." />}
+                         </motion.div>
+                       </motion.div>
+                     )}
+                   </AnimatePresence>
+                </div>
+
+                {/* Recessed Dice Slots */}
+                <div className="h-[30px] flex items-center justify-center w-full">
+                  <div className="flex gap-1 justify-center w-full">
+                    {[0, 1, 2, 3, 4].map((i) => (
+                      <div key={`o-slot-${i}`} className="relative w-5 h-5">
+                        <div className="absolute inset-0 bg-sumo-earth/10 rounded shadow-inner border border-sumo-earth/5" />
+                        {diceRevealed.opponent > i && showDice && (
+                          <motion.div 
+                            initial={{ opacity: 0, scale: 0.5, rotateX: 180 }}
+                            animate={{ 
+                              opacity: 1, 
+                              scale: 1, 
+                              rotateX: 0, 
+                              backgroundColor: ["#ffffff", getFlashColor(showDice.opponent.rolls[i], showDice.opponent.maxVal, "#991b1b"), "#991b1b"] 
+                            }}
+                            transition={{ duration: 0.3 }}
+                            className="absolute inset-0 text-white rounded text-[9px] flex items-center justify-center font-mono font-bold shadow-sm z-10"
+                          >
+                            {showDice.opponent.rolls[i]}
+                          </motion.div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Dice Info & Tally */}
+                <div className="h-[55px] flex flex-col items-center justify-end">
+                   <AnimatePresence>
+                     {['dice_info', 'rolling', 'done'].includes(animStep) && showDice && (
+                       <motion.div
+                         initial={{ opacity: 0, y: -5 }} 
+                         animate={{ opacity: 1, y: 0 }}
+                         className="flex flex-col items-center w-full"
+                       >
+                         {/* Dice Info */}
+                         <div className="text-[8px] font-bold opacity-40 mb-1 whitespace-nowrap text-red-800/80">
+                            (5d{showDice.opponent.maxVal}{showDice.opponent.irVal > 0 ? ` ir${showDice.opponent.irVal}` : ''})
+                         </div>
+
+                         {/* Tally */}
+                         <div className="text-xl font-serif italic font-black text-red-800 leading-none h-6 flex items-center justify-center">
+                            {['rolling', 'done'].includes(animStep) ? opponentTally : ''}
+                         </div>
+                       </motion.div>
+                     )}
+                   </AnimatePresence>
+                </div>
+             </div>
+          </div>
         </div>
 
         {/* Action Text Area (Anchored below dice) */}
@@ -796,14 +878,26 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
                 </div>
                 <div className="flex flex-wrap gap-2">
                    {TACHIAI_MOVES.map(move => (
-                     <button
-                       key={move.id}
-                       onClick={() => executeTachiai(move)}
-                       disabled={isRolling}
-                       className="bg-sumo-soft border border-sumo-earth/10 hover:border-sumo-accent p-2 rounded-xl flex-1 min-w-[45%] text-left active:scale-95 transition-all flex justify-between items-center"
-                     >
+                     <div
+                        key={move.id}
+                        onClick={(e) => { 
+                          if (isRolling) return;
+                          if ((e.target as HTMLElement).closest('.tooltip-trigger') || (e.target as HTMLElement).closest('.tooltip-portal')) return;
+                          executeTachiai(move); 
+                        }}
+                        className={`bg-sumo-soft border border-sumo-earth/10 shadow-sm hover:border-sumo-accent p-2 rounded-xl flex-1 min-w-[45%] text-left active:scale-95 transition-all flex justify-between items-center group relative cursor-pointer ${isRolling ? 'opacity-50 grayscale pointer-events-none' : ''}`}
+                      >
                        <div className="flex flex-col overflow-hidden flex-1 mr-2">
-                         <div className="text-[10px] font-bold text-sumo-ink truncate">{move.name}</div>
+                         <div className="flex items-center gap-1">
+                           <div className="text-[10px] font-bold text-sumo-ink truncate">{move.name}</div>
+                           {move.description && (
+                             <BonusTooltip 
+                               title={move.name}
+                               content={move.description} 
+                               icon={<Info size={8} className="stroke-[3px]" />} 
+                             />
+                           )}
+                         </div>
                          {move.counters && move.counters.length > 0 && (
                            <div className="text-[8px] font-mono opacity-60 text-sumo-ink truncate flex items-center mt-0.5">
                              <Swords size={8} className="mr-1 shrink-0 text-red-600" />
@@ -817,7 +911,7 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
                          <AttributeIcon attr={move.primaryAttr} size={12} />
                          <AttributeIcon attr={move.secondaryAttr} size={12} />
                        </div>
-                     </button>
+                     </div>
                    ))}
                 </div>
              </motion.div>
@@ -832,13 +926,29 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
                 <div className="text-[10px] font-black uppercase tracking-widest opacity-80 mb-2 px-1 text-sumo-accent">Initiative Won! Choose Stance</div>
                 <div className="flex gap-2">
                    {pendingStanceSelection.availableStances.map(stance => (
-                     <button
-                       key={stance}
-                       onClick={() => handleStanceSelected(stance)}
-                       className="bg-sumo-ink text-white border-2 border-sumo-earth/20 py-6 rounded-xl flex-1 text-center active:scale-95 transition-all shadow-md font-bold uppercase tracking-widest text-xs hover:bg-sumo-accent hover:border-sumo-accent"
-                     >
-                       {stance}
-                     </button>
+                     <div key={stance} className="flex-1 flex flex-col items-center">
+                       <div
+                         onClick={(e) => {
+                           if ((e.target as HTMLElement).closest('.tooltip-trigger') || (e.target as HTMLElement).closest('.tooltip-portal')) return;
+                           handleStanceSelected(stance);
+                         }}
+                         className="w-full bg-sumo-ink text-white border-2 border-sumo-earth/20 py-6 rounded-xl text-center active:scale-95 transition-all shadow-md font-bold uppercase tracking-widest text-xs hover:bg-sumo-accent hover:border-sumo-accent cursor-pointer"
+                       >
+                         {stance}
+                       </div>
+                       <div className="mt-2 group flex items-center justify-center">
+                          <BonusTooltip 
+                            title={stance}
+                            content={STANCE_DESCRIPTIONS[stance]} 
+                            icon={
+                              <div className="flex items-center gap-1">
+                                <Info size={10} className="stroke-[3px]" />
+                                <span className="text-[8px] font-black uppercase tracking-tighter opacity-70">What is {stance}?</span>
+                              </div>
+                            } 
+                          />
+                       </div>
+                     </div>
                    ))}
                 </div>
              </motion.div>
@@ -883,14 +993,26 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
                      OFFENSIVE_MOVES.filter(m => m.stanceRequirement === state.playerStance) : 
                      DEFENSIVE_MOVES
                    ).map(move => (
-                     <button
-                       key={move.id}
-                       onClick={() => executeCombatRound(move)}
-                       disabled={isRolling}
-                       className="bg-white border border-sumo-beige shadow-sm hover:border-sumo-accent p-2 rounded-xl text-left active:scale-95 transition-all flex justify-between items-center"
-                     >
+                     <div
+                        key={move.id}
+                        onClick={(e) => { 
+                          if (isRolling) return;
+                          if ((e.target as HTMLElement).closest('.tooltip-trigger') || (e.target as HTMLElement).closest('.tooltip-portal')) return;
+                          executeCombatRound(move); 
+                        }}
+                        className={`bg-white border border-sumo-beige shadow-sm hover:border-sumo-accent p-2 rounded-xl text-left active:scale-95 transition-all flex justify-between items-center group relative cursor-pointer ${isRolling ? 'opacity-50 grayscale pointer-events-none' : ''}`}
+                      >
                        <div className="flex flex-col overflow-hidden flex-1 mr-2">
-                         <div className="text-[10px] font-bold text-sumo-ink truncate">{move.name}</div>
+                         <div className="flex items-center gap-1">
+                           <div className="text-[10px] font-bold text-sumo-ink truncate">{move.name}</div>
+                           {move.description && (
+                             <BonusTooltip 
+                               title={move.name}
+                               content={move.description} 
+                               icon={<Info size={8} className="stroke-[3px]" />} 
+                             />
+                           )}
+                         </div>
                          {move.counters && move.counters.length > 0 && (
                            <div className="text-[8px] font-mono opacity-60 text-sumo-ink truncate flex items-center mt-0.5">
                              <Swords size={8} className="mr-1 shrink-0 text-red-600" />
@@ -904,7 +1026,7 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
                          <AttributeIcon attr={move.primaryAttr} size={12} />
                          <AttributeIcon attr={move.secondaryAttr} size={12} />
                        </div>
-                     </button>
+                     </div>
                    ))}
                 </div>
              </motion.div>

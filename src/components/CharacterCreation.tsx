@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Rikishi, RikishiStats, RikishiArchetype, BEYAS } from '../types';
-import { ChevronRight, ChevronLeft, Check } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Check, Info } from 'lucide-react';
 import { AttributeIcon } from './AttributeIcon';
+import { BonusTooltip } from './BonusTooltip';
+import { ARCHETYPE_DESCRIPTIONS } from '../constants/rikishi';
 import type { AttributeKey } from '../types';
 
 interface CharacterCreationProps {
@@ -230,7 +232,14 @@ export default function CharacterCreation({ onComplete }: CharacterCreationProps
                     className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${archetype === arch ? 'border-sumo-accent bg-white shadow-md' : 'border-sumo-beige bg-sumo-soft opacity-60'}`}
                   >
                     <div className="flex justify-between items-center mb-1">
-                      <span className="font-black text-sm uppercase tracking-tight">{arch.replace(/([A-Z])/g, ' $1').trim()} Specialist</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-black text-sm uppercase tracking-tight">{arch.replace(/([A-Z])/g, ' $1').trim()} Specialist</span>
+                        <BonusTooltip 
+                          title={`${arch.replace(/([A-Z])/g, ' $1').trim()} Style`}
+                          content={ARCHETYPE_DESCRIPTIONS[arch]} 
+                          icon={<Info size={12} className="stroke-[3px]" />}
+                        />
+                      </div>
                       {archetype === arch && <div className="bg-sumo-accent p-0.5 rounded-full text-white"><Check size={12} /></div>}
                     </div>
                     {arch !== 'Custom' && (
