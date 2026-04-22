@@ -332,7 +332,7 @@ export default function App() {
       } else {
         setRikishi(updatedPlayer);
         if (nextDay > maxDays) {
-          setView("basho-summary");
+          setView("dashboard");
         } else {
           setView("dashboard");
         }
@@ -349,7 +349,7 @@ export default function App() {
       );
       const maxDays = divisionInfo ? divisionInfo.bouts : 15;
       if (worldState.currentBashoDay > maxDays) {
-        setView("basho-summary");
+        setView("dashboard");
       } else {
         setView("dashboard");
       }
