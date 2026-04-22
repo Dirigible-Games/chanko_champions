@@ -1,4 +1,4 @@
-import { Rikishi, RankInfo, Division, SanyakuRank, RikishiStats } from '../types';
+import { Rikishi, RankInfo, Division, SanyakuRank, RikishiStats, AttributeKey, Injury } from '../types';
 import { BEYAS } from '../types';
 import { DIVISIONS } from '../constants/world';
 import { generateShikona } from './nameGenerator';

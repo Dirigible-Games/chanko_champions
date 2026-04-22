@@ -61,7 +61,8 @@ interface BoutProps {
     victoryKimarite: string | null, 
     fatigueUsed: boolean,
     focusSpent: number,
-    finalRound: number
+    finalRound: number,
+    hasInjuryTrigger: boolean
   }) => void;
 }
 

@@ -377,6 +377,15 @@ export function getSpecializationSlots(rank: RankInfo): number {
 export function selectNPCMove(npc: Rikishi, availableMoves: import('../types').Kimarite[], isTachiai: boolean = false): import('../types').Kimarite {
   const npcStats = getEffectiveStats(npc);
   
+  // Safe Fallback!
+  if (!availableMoves || availableMoves.length === 0) {
+      if (isTachiai) {
+          availableMoves = require('../constants/combat').TACHIAI_MOVES;
+      } else {
+          availableMoves = require('../constants/combat').OFFENSIVE_MOVES;
+      }
+  }
+
   let bestMove = availableMoves[0];
   let bestScore = -1;
 

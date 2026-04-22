@@ -62,7 +62,9 @@ function getExpectedScore(rikishi: Rikishi): number {
        
        if (past1 && past2) {
            const threeBashoWins = wins + past1.wins + past2.wins;
-           if (threeBashoWins >= 33) return 3; 
+           if (threeBashoWins >= 33 && past1.rank.division === 'Makuuchi' && past2.rank.division === 'Makuuchi') {
+               return 3; 
+           }
        }
        if (rank.title === 'Sekiwake' && wins >= 10 && past1 && past1.rank.title === 'Ozeki') {
            return 3;

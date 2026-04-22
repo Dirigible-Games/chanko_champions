@@ -1,6 +1,6 @@
 import { motion } from 'motion/react';
-import { X, Volume2, Music, Home, LogOut } from 'lucide-react';
-import { useState } from 'react';
+import { X, Volume2, Music, Home, LogOut, Maximize, Minimize } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -11,6 +11,30 @@ interface SettingsModalProps {
 export default function SettingsModal({ onClose, onMainMenu, onExit }: SettingsModalProps) {
   const [soundVolume, setSoundVolume] = useState(80);
   const [musicVolume, setMusicVolume] = useState(60);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      } else {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        }
+      }
+    } catch (err) {
+      console.warn("Fullscreen API not available or blocked in this environment");
+    }
+  };
 
   return (
     <motion.div 
@@ -68,6 +92,13 @@ export default function SettingsModal({ onClose, onMainMenu, onExit }: SettingsM
           </div>
 
           <div className="pt-4 space-y-3 border-t border-sumo-earth/20 mt-4">
+            <button 
+              onClick={toggleFullscreen}
+              className="w-full py-4 px-4 bg-white border border-sumo-earth/20 rounded-xl font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2 hover:bg-sumo-soft shadow-sm transition-colors text-sumo-ink active:scale-95"
+            >
+              {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />} 
+              {isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+            </button>
             <button 
               onClick={onMainMenu}
               className="w-full py-4 px-4 bg-white border border-sumo-earth/20 rounded-xl font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2 hover:bg-sumo-soft shadow-sm transition-colors text-sumo-ink active:scale-95"
