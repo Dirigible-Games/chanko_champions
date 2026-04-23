@@ -296,7 +296,7 @@ export function simulateBashoEnd(
       ...currentRikishi,
       wins: 0,
       losses: 0,
-      fatigue: currentRikishi.baseFatigue, // Reset to baseline
+      // Fatigue no longer resets to baseline; it persists to simulate aging/wear
     };
 
     if (r.id === playerRikishi.id) {

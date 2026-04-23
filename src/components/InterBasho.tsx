@@ -112,12 +112,13 @@ export default function InterBasho({ rikishi, updateRikishi, onFinish }: InterBa
     
     setLocalRikishi(prev => {
       const recovery = 40; // 40% Fatigue recovered
-      const newFatigue = Math.max(0, prev.fatigue - recovery);
+      // Fatigue cannot go below the baseFatigue floor
+      const newFatigue = Math.max(prev.baseFatigue, prev.fatigue - recovery);
       return {
         ...prev,
         tpAvailable: prev.tpAvailable - 1,
         fatigue: newFatigue,
-        energy: 100 - newFatigue // Assuming energy is inverse of fatigue for UI
+        energy: 100 - newFatigue 
       };
     });
   };
@@ -352,14 +353,19 @@ export default function InterBasho({ rikishi, updateRikishi, onFinish }: InterBa
                     <Coffee size={14} className="text-sumo-green" />
                     <h3 className="text-xs font-bold uppercase tracking-widest opacity-60">Physical Rest</h3>
                   </div>
-                  <span className="text-xs font-bold font-mono text-sumo-green">{localRikishi.fatigue}% Fatigue</span>
+                  <div className="text-right">
+                    <div className="text-xs font-bold font-mono text-sumo-green">{localRikishi.fatigue}% Fatigue</div>
+                    <div className="text-[8px] font-black uppercase tracking-widest opacity-30">Floor: {localRikishi.baseFatigue}%</div>
+                  </div>
                 </div>
                 <button
                   onClick={handleRest}
-                  disabled={localRikishi.tpAvailable < 1 || localRikishi.fatigue === 0}
+                  disabled={localRikishi.tpAvailable < 1 || localRikishi.fatigue <= localRikishi.baseFatigue}
                   className="w-full bg-sumo-soft hover:bg-sumo-beige p-3 rounded-xl flex justify-between items-center transition-colors disabled:opacity-30"
                 >
-                  <span className="text-[10px] font-bold uppercase tracking-widest">Rest for 40% Recovery</span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest">
+                    {localRikishi.fatigue <= localRikishi.baseFatigue ? "Maximum Recovery Reached" : "Rest for 40% Recovery"}
+                  </span>
                   <span className="text-[10px] font-black text-sumo-accent">-1 TP</span>
                 </button>
               </div>
