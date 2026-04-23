@@ -58,13 +58,52 @@ export default function App() {
   useEffect(() => {
     const savedWorld = localStorage.getItem("chanko_world_state");
     if (savedWorld) {
-      const parsedWorld: WorldState = JSON.parse(savedWorld);
-      setWorldState(parsedWorld);
-      const player = parsedWorld.rikishi.find(
-        (r) => r.id === parsedWorld.playerRikishiId,
-      );
-      if (player) {
-        setRikishi(player);
+      try {
+        const parsedWorld: WorldState = JSON.parse(savedWorld);
+        
+        let player = parsedWorld.rikishi.find(
+          (r) => r.id === parsedWorld.playerRikishiId,
+        );
+
+        // --- SAVE PHYSICIAN RECOVERY LOGIC ---
+        // Scenario 1: Player is missing from the world list (Orphaned)
+        if (!player && parsedWorld.playerRikishiId) {
+          console.warn("Save Physician: Player orphaned. Attempting reconstruction.");
+          const legacyPlayer = localStorage.getItem("chanko_rikishi");
+          if (legacyPlayer) {
+            const recovered = JSON.parse(legacyPlayer);
+            if (recovered && recovered.id === parsedWorld.playerRikishiId) {
+              player = recovered;
+              parsedWorld.rikishi.push(player);
+            }
+          }
+        }
+
+        // Scenario 2: World list was empty/corrupted
+        if (!parsedWorld.rikishi || parsedWorld.rikishi.length === 0) {
+          console.warn("Save Physician: World corrupt. Re-seeding.");
+          const newWorldList = seedWorld();
+          parsedWorld.rikishi = newWorldList;
+          // Re-insert player if we have one
+          if (player) parsedWorld.rikishi.push(player);
+        }
+
+        // Scenario 3: Player exists but rank data is corrupted
+        if (player && (!player.rank || !player.rank.division)) {
+          console.warn("Save Physician: Repairing player rank.");
+          player.rank = { division: "Jonokuchi", title: 1, side: "East" };
+        }
+        // -------------------------------------
+
+        setWorldState(parsedWorld);
+        if (player) {
+          setRikishi(player);
+          // Update the world state back to storage with the repairs if any happened
+          localStorage.setItem("chanko_world_state", JSON.stringify(parsedWorld));
+        }
+      } catch (e) {
+        console.error("Save Physician: Failed to parse world state", e);
+        localStorage.removeItem("chanko_world_state"); // Clear corrupted state
       }
     } else {
       // Backwards compatibility for older saves
