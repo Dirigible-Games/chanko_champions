@@ -190,22 +190,40 @@ export default function App() {
     if (action === "leaderboard") setView("leaderboard");
     if (action === "end-basho") {
       if (rikishi && worldState) {
-        setOldRank(rikishi.rank);
-        const { updatedWorld, updatedPlayer } = simulateBashoEnd(
-          worldState,
-          rikishi,
-        );
-        saveRikishi({
-          ...updatedPlayer,
-          momentum: { attribute: null, value: 1 },
-        });
-        setWorldState(updatedWorld);
-        localStorage.setItem(
-          "chanko_world_state",
-          JSON.stringify(updatedWorld),
-        );
+        try {
+          setOldRank(rikishi.rank);
+          const { updatedWorld, updatedPlayer } = simulateBashoEnd(
+            worldState,
+            rikishi,
+          );
+          
+          if (!updatedPlayer || !updatedPlayer.rank) {
+            throw new Error("Simulation failed to produce a valid player state.");
+          }
+
+          const finalPlayer = {
+            ...updatedPlayer,
+            momentum: { attribute: null, value: 1 },
+          };
+
+          const finalWorld = {
+            ...updatedWorld,
+            rikishi: updatedWorld.rikishi.map(r => r.id === finalPlayer.id ? finalPlayer : r)
+          };
+
+          // Synchronous update of state to prevent inconsistent rendering
+          setRikishi(finalPlayer);
+          setWorldState(finalWorld);
+          
+          localStorage.setItem("chanko_rikishi", JSON.stringify(finalPlayer));
+          localStorage.setItem("chanko_world_state", JSON.stringify(finalWorld));
+          
+          setView("basho-summary");
+        } catch (error) {
+          console.error("Basho End Simulation Failed:", error);
+          setView("main-menu");
+        }
       }
-      setView("basho-summary");
     }
     if (action === "fight") {
       const savedState = localStorage.getItem("chanko_world_state");
@@ -357,6 +375,12 @@ export default function App() {
       setView("dashboard");
     }
   };
+
+  if (!rikishi && view !== "main-menu" && view !== "creation") {
+    // If we're missing rikishi data but not on start screens, reset to safely recover
+    setView("main-menu");
+    return null;
+  }
 
   return (
     <div className="flex justify-center h-[100dvh] bg-sumo-outer overflow-hidden select-none">

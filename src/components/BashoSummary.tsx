@@ -15,11 +15,13 @@ interface BashoSummaryProps {
 export default function BashoSummary({ rikishi, oldRank, worldState, onContinue }: BashoSummaryProps) {
   if (!worldState) return null;
 
-  const divisionInfo = DIVISIONS.find(d => d.name === rikishi.rank.division);
+  const divisionInfo = DIVISIONS.find(d => d.name === rikishi?.rank?.division);
   // We need to look back at career history to find wins/losses since they were reset by simulation
-  const lastHistory = rikishi.careerHistory[rikishi.careerHistory.length - 1];
-  const wins = lastHistory ? lastHistory.wins : 0;
-  const losses = lastHistory ? lastHistory.losses : 0;
+  const lastHistory = rikishi?.careerHistory && rikishi.careerHistory.length > 0 
+    ? rikishi.careerHistory[rikishi.careerHistory.length - 1] 
+    : null;
+  const wins = lastHistory ? lastHistory.wins : (rikishi?.wins || 0);
+  const losses = lastHistory ? lastHistory.losses : (rikishi?.losses || 0);
   
   const totalBouts = divisionInfo ? divisionInfo.bouts : 15;
   const isKachiKoshi = wins > totalBouts / 2;

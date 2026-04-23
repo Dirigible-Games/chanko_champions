@@ -22,7 +22,8 @@ function getGlobalRankScore(rank: RankInfo): number {
     'Jonidan': 349,
     'Jonokuchi': 609
   };
-  return offsets[rank.division] + ((rank.title as number) * 2) - (rank.side === 'East' ? 1 : 0);
+  const offset = offsets[rank.division] ?? 609; // Default to Jonokuchi
+  return offset + ((rank.title as number) * 2) - (rank.side === 'East' ? 1 : 0);
 }
 
 function getExpectedScore(rikishi: Rikishi): number {
@@ -93,8 +94,8 @@ export function reRankAllDivisions(allRikishi: Rikishi[]): Rikishi[] {
     // Sort globally
     scoredRikishi.sort((a, b) => {
        if (a.expectedScore !== b.expectedScore) return a.expectedScore - b.expectedScore;
-       const netA = a.rikishi.wins - a.rikishi.losses;
-       const netB = b.rikishi.wins - b.rikishi.losses;
+       const netA = (a.rikishi?.wins || 0) - (a.rikishi?.losses || 0);
+       const netB = (b.rikishi?.wins || 0) - (b.rikishi?.losses || 0);
        if (netA !== netB) return netB - netA;
        return a.currentScore - b.currentScore;
     });
@@ -201,6 +202,7 @@ export function reRankAllDivisions(allRikishi: Rikishi[]): Rikishi[] {
  * Returns a human-readable rank name
  */
 export function formatRank(rank: RankInfo): string {
+  if (!rank) return "Unknown Rank";
   if (typeof rank.title === 'string') {
     return `${rank.title} ${rank.side || ''}`.trim();
   }
@@ -211,6 +213,7 @@ export function formatRank(rank: RankInfo): string {
  * Returns a short abbreviation of the rank, e.g., (Jk1E) or (Y1E)
  */
 export function abbreviateRank(rank: RankInfo): string {
+  if (!rank) return "(?)";
   const side = rank.side === 'East' ? 'E' : rank.side === 'West' ? 'W' : '';
   
   if (rank.division === 'Makuuchi') {
