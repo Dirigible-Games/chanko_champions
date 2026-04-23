@@ -305,7 +305,7 @@ export function simulateBashoEnd(
         r.wins,
         r.losses,
         bouts,
-        origRikishi.rank,
+        oldRank,
         r.rank,
         isYusho || false,
         false,
