@@ -367,10 +367,18 @@ export default function App() {
               onClose={() => setShowSettings(false)}
               onMainMenu={() => {
                 setShowSettings(false);
-                setView("main-menu");
+                // Hard refresh to reload the application and return to main-menu (default state)
+                window.location.reload();
               }}
               onExit={() => {
-                window.close();
+                setShowSettings(false);
+                setView("main-menu");
+                // Attempt to close window, but fallback to main menu is already handled above
+                try {
+                  window.close();
+                } catch (e) {
+                  // Ignore security block on window.close()
+                }
               }}
             />
           )}
