@@ -147,18 +147,29 @@ export function evaluateRetirement(rikishi: Rikishi): boolean {
   const injuries = Object.values(rikishi.injuries);
   const maxSeverity = Math.max(0, ...injuries.map(i => i.severity));
   
+  const isSekitori = ['Makuuchi', 'Juryo'].includes(rikishi.rank.division);
+  const totalPermPenalties = Object.values(rikishi.permanentPenalties).reduce((a, b) => a + b, 0);
+
   // High number of bashos + dropping rank + major injuries = retirement
   if (rikishi.bashosCompleted > 30) {
-     if (maxSeverity >= 3 && secureRandom() < 0.5) return true;
-     
-     // 10 years+ and stuck in low division
-     if (rikishi.bashosCompleted > 60 && ['Makushita', 'Sandanme', 'Jonidan', 'Jonokuchi'].includes(rikishi.rank.division)) {
-        if (secureRandom() < 0.1) return true;
+     if (!isSekitori) {
+        // Non-sekitori are much more likely to retire if severely injured
+        if (maxSeverity >= 3 && secureRandom() < 0.4) return true;
+        
+        // 10 years+ and stuck in low division
+        if (rikishi.bashosCompleted > 60 && secureRandom() < 0.1) return true;
+        
+        // Too many permanent penalties
+        if (totalPermPenalties > 8 && secureRandom() < 0.2) return true;
+     } else {
+        // Sekitori will fight through injuries, but might retire if they are extremely veteran
+        // and severely injured, though less commonly than lower rankers.
+        if (rikishi.bashosCompleted > 60 && maxSeverity >= 3 && secureRandom() < 0.15) return true;
+        if (totalPermPenalties > 10 && secureRandom() < 0.1) return true;
+        
+        // Very old veterans might just retire if hurt
+        if (rikishi.bashosCompleted > 90 && maxSeverity >= 1 && secureRandom() < 0.2) return true;
      }
-
-     // Too many permanent penalties
-     const totalPermPenalties = Object.values(rikishi.permanentPenalties).reduce((a, b) => a + b, 0);
-     if (totalPermPenalties > 8 && secureRandom() < 0.2) return true;
   }
   return false;
 }
