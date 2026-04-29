@@ -43,7 +43,7 @@ export default function InjuryResolution({ rikishi, onComplete }: InjuryResoluti
 
       if (rikishi.fatigue < 60) {
         // Tiers 1 and 2: Single attribute for all attempts
-        const selectedAttr = attrs[secureRandomInt(attrs.length)];
+        const selectedAttr = attrs[secureRandomInt(attrs.length) - 1];
         finalizedResults = rawResults.map(res => ({
           attr: selectedAttr,
           severity: res.severity
@@ -51,7 +51,7 @@ export default function InjuryResolution({ rikishi, onComplete }: InjuryResoluti
       } else {
         // Tiers 3 and 4: Random attribute for each attempt
         finalizedResults = rawResults.map(res => ({
-          attr: attrs[secureRandomInt(attrs.length)],
+          attr: attrs[secureRandomInt(attrs.length) - 1],
           severity: res.severity
         }));
       }

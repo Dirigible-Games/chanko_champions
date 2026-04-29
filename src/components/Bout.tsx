@@ -293,7 +293,7 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
           setState(prev => ({ ...prev, round: 2 }));
           setPhase('stance_selection');
         } else {
-          const nextStance = nextStances[secureRandomInt(nextStances.length)];
+          const nextStance = nextStances[secureRandomInt(nextStances.length) - 1];
           const winnerName = winner === 'player' ? rikishi.name : opponent.name;
           addLog(`${winnerName} transitions into ${nextStance} stance.`);
           
@@ -532,7 +532,7 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
           setState(prev => ({ ...prev, round: prev.round + 1 }));
           setPhase('stance_selection');
         } else {
-          const nextStance = nextStances[secureRandomInt(nextStances.length)];
+          const nextStance = nextStances[secureRandomInt(nextStances.length) - 1];
           const defenderName = isPlayerAttacking ? opponent.name : rikishi.name;
           addLog(`${defenderName} transitions into ${nextStance} stance.`);
           

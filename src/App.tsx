@@ -181,7 +181,7 @@ export default function App() {
     );
     let mockOpp =
       sameDiv.length > 0
-        ? sameDiv[secureRandomInt(sameDiv.length)]
+        ? sameDiv[secureRandomInt(sameDiv.length) - 1]
         : worldState.rikishi.filter((r) => r.isNPC)[0];
 
     if (!mockOpp) {

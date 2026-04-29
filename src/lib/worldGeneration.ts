@@ -87,8 +87,43 @@ export function generateNPCRikishi(rank: RankInfo, existingNames: Set<string>): 
     }
   });
 
-  const beya = BEYAS[secureRandomInt(BEYAS.length)];
-  const bashosCompleted = 5 + secureRandomInt(80) - 1; // 5 to 84 bashos
+  const beya = BEYAS[secureRandomInt(BEYAS.length) - 1];
+  
+  let minBashos = 1;
+  let maxBashoAdd = 60;
+  
+  switch (rank.division) {
+    case 'Makuuchi':
+      if (rank.title === 'Yokozuna') minBashos = 30;
+      else if (rank.title === 'Ozeki') minBashos = 22;
+      else if (rank.title === 'Sekiwake' || rank.title === 'Komusubi') minBashos = 18;
+      else minBashos = 14;
+      maxBashoAdd = 50;
+      break;
+    case 'Juryo':
+      minBashos = 10;
+      maxBashoAdd = 60;
+      break;
+    case 'Makushita':
+      minBashos = 6;
+      maxBashoAdd = 70;
+      break;
+    case 'Sandanme':
+      minBashos = 3;
+      maxBashoAdd = 60;
+      break;
+    case 'Jonidan':
+      minBashos = 2;
+      maxBashoAdd = 50;
+      break;
+    case 'Jonokuchi':
+    default:
+      minBashos = 1;
+      maxBashoAdd = 15; 
+      break;
+  }
+  
+  const bashosCompleted = minBashos + secureRandomInt(maxBashoAdd) - 1;
   
   // Calculate Base Stats for legacy
   const baseFatigue = Math.floor(bashosCompleted / 2);
@@ -112,7 +147,7 @@ export function generateNPCRikishi(rank: RankInfo, existingNames: Set<string>): 
     const rolls = Math.floor(bashosCompleted / 10); // One per ~year
     for (let i = 0; i < rolls; i++) {
       if (secureRandom() < 0.2) { // 20% chance of a historical permanent injury per roll
-        const attr = attrs[secureRandomInt(attrs.length)];
+        const attr = attrs[secureRandomInt(attrs.length) - 1];
         permanentPenalties[attr] += 1;
         totalUniqueInjuries += 1;
       }

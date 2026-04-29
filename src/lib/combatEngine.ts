@@ -135,7 +135,7 @@ export function simulateFullBout(
         } else {
           nextStances = ["Neutral"];
         }
-        const nextStance = nextStances[secureRandomInt(nextStances.length)];
+        const nextStance = nextStances[secureRandomInt(nextStances.length) - 1];
         if (r1Won) {
           r1Stance = nextStance;
           r2Stance = "Neutral";
@@ -263,7 +263,7 @@ export function simulateFullBout(
             nextStances = ["Neutral"];
           }
           const nextStance =
-            nextStances[secureRandomInt(nextStances.length)];
+            nextStances[secureRandomInt(nextStances.length) - 1];
           if (r1Attacking) {
             r2Stance = nextStance;
             r1Stance = "Neutral";

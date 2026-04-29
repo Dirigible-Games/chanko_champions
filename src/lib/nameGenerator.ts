@@ -28,9 +28,15 @@ export function generateShikona(beya: string, existingNames: Set<string>): strin
   while (attempts < 500) {
     attempts++;
     
-    // Choose 2-5 parts to make up the name (representing 2-5 Kanji)
+    // Choose 2-4 parts to make up the name (representing 2-4 Kanji)
     const convention = BEYA_CONVENTIONS[beya];
-    const partCount = secureRandomInt(4) + 2; // 2 to 5 parts
+    
+    // Weighted length: mostly 3 parts, then 2 parts, sometimes 4 parts.
+    const rand = secureRandom();
+    let partCount = 3;
+    if (rand < 0.25) partCount = 2;
+    else if (rand > 0.85) partCount = 4;
+    
     const parts: string[] = [];
     // Track parts used *in this attempt* to avoid repetition
     const usedInName = new Set<string>();
@@ -42,11 +48,11 @@ export function generateShikona(beya: string, existingNames: Set<string>): strin
         // Try to find a unique part up to 10 times
         for(let j = 0; j < 10; j++) {
             if (i === 0 && convention && secureRandom() < 0.7) {
-                choice = convention.prefixes?.[secureRandomInt(convention.prefixes.length)] || CHARS[secureRandomInt(CHARS.length)];
+                choice = convention.prefixes?.[secureRandomInt(convention.prefixes.length) - 1] || CHARS[secureRandomInt(CHARS.length) - 1];
             } else if (i === partCount - 1 && convention && secureRandom() < 0.7) {
-                choice = convention.suffixes?.[secureRandomInt(convention.suffixes.length)] || CHARS[secureRandomInt(CHARS.length)];
+                choice = convention.suffixes?.[secureRandomInt(convention.suffixes.length) - 1] || CHARS[secureRandomInt(CHARS.length) - 1];
             } else {
-                choice = CHARS[secureRandomInt(CHARS.length)];
+                choice = CHARS[secureRandomInt(CHARS.length) - 1];
             }
 
             if (!usedInName.has(choice)) {

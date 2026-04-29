@@ -189,40 +189,45 @@ export default function WorldBrowser({ worldState }: WorldBrowserProps) {
         </div>
       </header>
 
-      {/* Main Content */}
-      <div className="flex-1 overflow-y-auto no-scrollbar bg-sumo-outer p-4">
+      {/* Filter Header */}
+      <div className="px-4 pt-4 pb-3 bg-sumo-outer shadow-[0_4px_10px_rgba(0,0,0,0.03)] z-10 shrink-0">
         {activeTab === 'banzuke' && (
-          <div className="mb-4 overflow-x-auto no-scrollbar flex gap-2 pb-2">
-            {DIVISIONS.map((div) => (
-              <button
-                key={div.name}
-                onClick={() => setSelectedDivision(div.name)}
-                className={`flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${
-                  selectedDivision === div.name
-                    ? 'bg-sumo-ink text-white shadow-md'
-                    : 'bg-white/50 text-sumo-ink/60 hover:bg-white'
-                }`}
-              >
-                {div.name}
-              </button>
-            ))}
-          </div>
+           <div className="relative">
+            <select
+              value={selectedDivision || ''}
+              onChange={(e) => setSelectedDivision(e.target.value as Division)}
+              className="w-full p-4 rounded-xl text-sm font-bold text-sumo-ink bg-white shadow-sm border-none focus:ring-2 focus:ring-sumo-accent appearance-none"
+            >
+              {DIVISIONS.map(div => (
+                <option key={div.name} value={div.name}>{div.name} Division</option>
+              ))}
+            </select>
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-sumo-ink/40">
+              <ChevronDown size={16} />
+            </div>
+           </div>
         )}
 
         {activeTab === 'beya' && (
-           <div className="mb-4">
+           <div className="relative">
             <select
               value={selectedBeya || ''}
               onChange={(e) => setSelectedBeya(e.target.value)}
-              className="w-full p-4 rounded-xl text-sm font-bold text-sumo-ink bg-white shadow-sm border-none focus:ring-2 focus:ring-sumo-accent appearance-none relative"
+              className="w-full p-4 rounded-xl text-sm font-bold text-sumo-ink bg-white shadow-sm border-none focus:ring-2 focus:ring-sumo-accent appearance-none"
             >
               {BEYAS.map(beya => (
                 <option key={beya} value={beya}>{beya} Stable</option>
               ))}
             </select>
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-sumo-ink/40">
+              <ChevronDown size={16} />
+            </div>
            </div>
         )}
+      </div>
 
+      {/* Main Content */}
+      <div className="flex-1 overflow-y-auto no-scrollbar bg-sumo-outer p-4">
         {renderRikishiList(activeTab === 'banzuke' ? banzukeRikishi : beyaRikishi)}
       </div>
     </div>

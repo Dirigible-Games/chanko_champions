@@ -97,11 +97,11 @@ export function simulateAllBoutsForDay(
         
         let targetAttr: AttributeKey | null = null;
         if (result.updatedR1.fatigue < 60) {
-          targetAttr = attrs[secureRandomInt(attrs.length)];
+          targetAttr = attrs[secureRandomInt(attrs.length) - 1];
         }
 
         severityResult.results.forEach(res => {
-          const attr = targetAttr || attrs[secureRandomInt(attrs.length)];
+          const attr = targetAttr || attrs[secureRandomInt(attrs.length) - 1];
           result.updatedR1 = applyInjury(
             result.updatedR1,
             res.severity,
@@ -117,11 +117,11 @@ export function simulateAllBoutsForDay(
         
         let targetAttr: AttributeKey | null = null;
         if (result.updatedR2.fatigue < 60) {
-          targetAttr = attrs[secureRandomInt(attrs.length)];
+          targetAttr = attrs[secureRandomInt(attrs.length) - 1];
         }
 
         severityResult.results.forEach(res => {
-          const attr = targetAttr || attrs[secureRandomInt(attrs.length)];
+          const attr = targetAttr || attrs[secureRandomInt(attrs.length) - 1];
           result.updatedR2 = applyInjury(
             result.updatedR2,
             res.severity,
@@ -184,14 +184,14 @@ export function simulateBashoEnd(
             const isHighRankTitle = typeof rikishi.rank.title === 'string' && ['Yokozuna', 'Ozeki', 'Sekiwake', 'Komusubi'].includes(rikishi.rank.title);
             const isHighMaegashira = typeof rikishi.rank.title === 'number' && rikishi.rank.title <= 5;
             
-            if (severity > 0 && (isHighRankTitle || isHighMaegashira)) {
+            if (severity >= 3 && (isHighRankTitle || isHighMaegashira)) {
                newsForThisMonth.push({
                  id: secureRandomInt(1000000).toString(36),
                  year: worldState.currentYear,
                  month: worldState.currentMonth,
                  type: "general",
                  division: rikishi.rank.division,
-                 text: `${rikishi.name} (${abbreviateRank(rikishi.rank)}) was injured on Day ${day} in a bout!`
+                 text: `${rikishi.name} (${abbreviateRank(rikishi.rank)}) was severely injured on Day ${day} in a bout!`
                });
             }
           }
@@ -233,7 +233,7 @@ export function simulateBashoEnd(
         "spirit",
       ];
       for (let i = 0; i < tpEarned; i++) {
-        const attr = attrs[secureRandomInt(attrs.length)];
+        const attr = attrs[secureRandomInt(attrs.length) - 1];
         r.stats[attr] += 1;
       }
       r.fatigue = Math.max(0, r.fatigue - 40);
