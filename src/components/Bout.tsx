@@ -593,6 +593,56 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
     <div className="h-full flex flex-col bg-sumo-paper overflow-hidden relative">
       <div className="absolute inset-0 bg-[url('/clay-texture.png')] opacity-5 pointer-events-none" />
       
+      {/* Mono-ii Modal Overlay */}
+      <AnimatePresence>
+        {phase === 'monoii' && monoiiData && (
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-50 flex items-center justify-center bg-sumo-dark/80 backdrop-blur-sm p-4"
+          >
+            <motion.div 
+                 initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0 }}
+                 className="w-full max-w-sm bg-sumo-soft rounded-2xl shadow-2xl border border-sumo-earth/30 flex flex-col pt-6 pb-6 px-4 text-center"
+             >
+                 <div className="flex flex-col items-center">
+                   <div className="bg-red-800 text-white px-3 py-1 rounded text-[10px] font-black uppercase tracking-widest shadow-md">
+                     MONO-II
+                   </div>
+                   <h3 className="text-xl font-serif font-black italic tracking-wide uppercase text-sumo-ink mt-3">
+                     Shinpan Deliberation
+                   </h3>
+                   <p className="text-xs text-sumo-ink/70 mt-1 max-w-[260px]">
+                     The judges have gathered to review the outcome of the exchange.
+                   </p>
+                 </div>
+
+                 <div className="flex flex-col items-center justify-center my-4 bg-white/70 py-4 rounded-xl border border-sumo-earth/40 shadow-inner">
+                    <div className="text-[10px] font-black uppercase tracking-widest text-sumo-ink/50 mb-2">Shinpan's Roll (1d10)</div>
+                    <div className="w-16 h-16 bg-white border-2 border-sumo-ink rounded-lg shadow-md flex items-center justify-center font-serif text-3xl font-black text-sumo-ink">
+                      {monoiiData.roll}
+                    </div>
+                    <div className="mt-3 text-sm font-bold uppercase tracking-widest text-red-800">
+                      {monoiiData.result === 'attacker' && "Ruling Stands"}
+                      {monoiiData.result === 'defender' && "Ruling Reversed"}
+                      {monoiiData.result === 'rematch' && "Torinaoshi (Rematch)"}
+                    </div>
+                 </div>
+
+                 <div className="w-full max-w-[280px] mx-auto">
+                    <button
+                     onClick={handleMonoiiResolution}
+                     className="w-full bg-[#362624] text-white py-3.5 rounded-lg font-bold uppercase tracking-[0.15em] text-xs shadow-md shadow-black/20 hover:bg-black active:scale-95 transition-all outline-none"
+                   >
+                     Acknowledge
+                   </button>
+                 </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Combat Info Bar (Moved above Dohyo) */}
       <div className="bg-sumo-ink p-3 flex justify-between items-center text-white shrink-0 z-10 shadow-md">
         {/* Left Side: Player */}
@@ -1080,46 +1130,17 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
              </motion.div>
           )}
 
-           {phase === 'monoii' && monoiiData && (
-              <motion.div 
-                key="monoii" 
-                initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-                className="text-center space-y-4 px-4 pt-4 pb-6 h-full flex flex-col justify-center bg-sumo-soft border-t border-sumo-earth/30"
-              >
-                <div className="flex flex-col items-center">
-                  <div className="bg-red-800 text-white px-3 py-1 rounded text-[10px] font-black uppercase tracking-widest shadow-md">
-                    MONO-II
-                  </div>
-                  <h3 className="text-xl font-serif font-black italic tracking-wide uppercase text-sumo-ink mt-3">
-                    Shinpan Deliberation
-                  </h3>
-                  <p className="text-xs text-sumo-ink/70 mt-1 max-w-[260px]">
-                    The judges have gathered to review the outcome of the exchange.
-                  </p>
+          {phase === 'monoii' && (
+             <motion.div 
+               key="monoii_bg" 
+               initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+               className="flex items-center justify-center h-full opacity-50"
+             >
+                <div className="text-center font-serif italic uppercase tracking-widest text-sm text-sumo-ink animate-pulse">
+                   Shinpan Deliberation...
                 </div>
-
-                <div className="flex flex-col items-center justify-center my-4 bg-white/70 py-4 rounded-xl border border-sumo-earth/40 shadow-inner">
-                   <div className="text-[10px] font-black uppercase tracking-widest text-sumo-ink/50 mb-2">Shinpan's Roll (1d10)</div>
-                   <div className="w-16 h-16 bg-white border-2 border-sumo-ink rounded-lg shadow-md flex items-center justify-center font-serif text-3xl font-black text-sumo-ink">
-                     {monoiiData.roll}
-                   </div>
-                   <div className="mt-3 text-sm font-bold uppercase tracking-widest text-red-800">
-                     {monoiiData.result === 'attacker' && "Ruling Stands"}
-                     {monoiiData.result === 'defender' && "Ruling Reversed"}
-                     {monoiiData.result === 'rematch' && "Torinaoshi (Rematch)"}
-                   </div>
-                </div>
-
-                <div className="w-full max-w-[280px] mx-auto">
-                   <button
-                    onClick={handleMonoiiResolution}
-                    className="w-full bg-[#362624] text-white py-3.5 rounded-lg font-bold uppercase tracking-[0.15em] text-xs shadow-md shadow-black/20 hover:bg-black active:scale-95 transition-all outline-none"
-                  >
-                    Acknowledge
-                  </button>
-                </div>
-              </motion.div>
-           )}
+             </motion.div>
+          )}
 
            {phase === 'result' && (
              <motion.div 
