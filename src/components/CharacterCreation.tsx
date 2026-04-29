@@ -7,6 +7,7 @@ import { BonusTooltip } from './BonusTooltip';
 import { ARCHETYPE_DESCRIPTIONS } from '../constants/rikishi';
 import type { AttributeKey } from '../types';
 import { secureRandomInt } from '../lib/gameLogic';
+import ShikonaBuilder from './ShikonaBuilder';
 
 interface CharacterCreationProps {
   onComplete: (rikishi: Rikishi) => void;
@@ -39,6 +40,7 @@ const STAT_DESCRIPTIONS: Record<keyof Omit<RikishiStats, 'weight'>, string> = {
 export default function CharacterCreation({ onComplete }: CharacterCreationProps) {
   const [step, setStep] = useState(1);
   const [name, setName] = useState('');
+  const [nameKanji, setNameKanji] = useState('');
   const [color, setColor] = useState('#8B4513');
   const [beya, setBeya] = useState(BEYAS[0]);
   const [archetype, setArchetype] = useState<RikishiArchetype>('Yotsu');
@@ -83,6 +85,7 @@ export default function CharacterCreation({ onComplete }: CharacterCreationProps
     const newRikishi: Rikishi = {
       id: secureRandomInt(1000000).toString(36) + secureRandomInt(1000000).toString(36),
       name: name || 'Unlabeled Rikishi',
+      nameKanji,
       rank: { division: 'Jonokuchi', title: 10, side: 'West' }, // Start at bottom
       beya,
       mawashiColor: color,
@@ -130,8 +133,8 @@ export default function CharacterCreation({ onComplete }: CharacterCreationProps
           ))}
         </div>
         <h2 className="text-xl font-serif font-black italic text-sumo-ink uppercase tracking-tighter">
-          {step === 1 && "Choose Your Shikona"}
-          {step === 2 && "The Stable & Colors"}
+          {step === 1 && "The Stable & Colors"}
+          {step === 2 && "Choose Your Shikona"}
           {step === 3 && "Wrestling Style"}
           {step === 4 && archetype === 'Custom' ? "Finishing Touches" : step === 4 ? "Review" : ""}
         </h2>
@@ -142,30 +145,6 @@ export default function CharacterCreation({ onComplete }: CharacterCreationProps
           {step === 1 && (
             <motion.div
               key="step1"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-6 pt-4"
-            >
-              <p className="text-sm text-sumo-ink/60 font-medium leading-relaxed">
-                Every great journey begins with a name. This name will be shouted in the Kokugikan for years to come.
-              </p>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-widest opacity-40">Wrestler Name</label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  placeholder="Enter Shikona..."
-                  className="w-full bg-white border-2 border-sumo-beige rounded-2xl p-4 text-lg font-serif font-bold focus:border-sumo-accent outline-none transition-colors shadow-sm"
-                />
-              </div>
-            </motion.div>
-          )}
-
-          {step === 2 && (
-            <motion.div
-              key="step2"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
@@ -200,28 +179,32 @@ export default function CharacterCreation({ onComplete }: CharacterCreationProps
                       onChange={e => setColor(e.target.value)}
                       className="w-10 h-10 opacity-0 cursor-pointer absolute inset-0 z-10"
                     />
-                    <div 
-                      className="w-10 h-10 rounded-full bg-gradient-to-tr from-red-500 via-green-500 to-blue-500 flex items-center justify-center text-white border-2 border-transparent"
-                    >
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-red-500 via-green-500 to-blue-500 flex items-center justify-center text-white border-2 border-transparent">
                       <span className="text-[10px] font-black">+</span>
                     </div>
                   </div>
                 </div>
               </div>
-              
-              {/* Preview */}
-              <div className="mt-8 bg-sumo-soft p-6 rounded-3xl border border-sumo-earth flex items-center gap-4">
-                <div 
-                  className="w-16 h-16 rounded-full border-4 border-white shadow-xl flex items-center justify-center font-serif text-3xl font-black text-white"
-                  style={{ backgroundColor: color }}
-                >
-                  {name ? name[0] : '?'}
-                </div>
-                <div>
-                  <h4 className="font-bold text-sumo-ink">{name || 'Unknown'}</h4>
-                  <p className="text-[10px] uppercase font-bold text-sumo-accent">{beya} Stable</p>
-                </div>
-              </div>
+            </motion.div>
+          )}
+
+          {step === 2 && (
+            <motion.div
+              key="step2"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="pt-2 h-full"
+            >
+              <ShikonaBuilder 
+                initialName={name}
+                initialKanji={nameKanji}
+                beya={beya}
+                onChange={(n, k) => {
+                  setName(n);
+                  setNameKanji(k);
+                }}
+              />
             </motion.div>
           )}
 
@@ -278,20 +261,7 @@ export default function CharacterCreation({ onComplete }: CharacterCreationProps
                 ))}
               </div>
               
-              {/* Stat Legend */}
-              <div className="mt-6 space-y-2.5 px-1 border-t border-sumo-beige/20 pt-4">
-                {Object.entries(STAT_DESCRIPTIONS).map(([stat, desc]) => (
-                  <div key={stat} className="flex items-center gap-3">
-                    <div className="shrink-0">
-                      <AttributeIcon attr={stat as AttributeKey} size={16} />
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-[10px] font-black uppercase tracking-tight text-sumo-ink leading-none">{STAT_LABELS[stat as keyof typeof STAT_DESCRIPTIONS]}</span>
-                      <p className="text-[11px] text-sumo-ink/60 font-medium leading-tight mt-0.5">{desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+
             </motion.div>
           )}
 
@@ -386,11 +356,11 @@ export default function CharacterCreation({ onComplete }: CharacterCreationProps
         
         {step < 4 ? (
           <button 
-            disabled={step === 1 && !name.trim()}
+            disabled={step === 2 && !name.trim()}
             onClick={handleNext}
             className="flex-[2] bg-sumo-ink text-white p-4 rounded-2xl font-bold uppercase tracking-[0.2em] text-xs shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-30"
           >
-            Continue <ChevronRight size={16} />
+            {step === 2 ? 'Confirm Name' : 'Continue'} <ChevronRight size={16} />
           </button>
         ) : (
           <button 

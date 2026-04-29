@@ -76,6 +76,7 @@ export interface BoutState {
 export interface Rikishi {
   id: string;
   name: string;
+  nameKanji?: string;
   rank: RankInfo;
   beya: string;
   mawashiColor: string;

@@ -26,7 +26,7 @@ export default function Leaderboard({ rikishi, allRikishi, onAction }: Leaderboa
              <div className="flex items-center gap-4">
                 <span className="font-mono font-bold text-sumo-ink/30 w-4">{i + 1}</span>
                 <div>
-                   <div className="font-bold text-sumo-ink">{r.name}</div>
+                   <div className="font-bold text-sumo-ink">{r.name} {r.nameKanji && <span className="opacity-60 ml-1 font-serif text-sm">({r.nameKanji})</span>}</div>
                    <div className="text-[10px] opacity-60">{abbreviateRank(r.rank)}</div>
                 </div>
              </div>

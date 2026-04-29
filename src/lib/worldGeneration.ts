@@ -154,9 +154,12 @@ export function generateNPCRikishi(rank: RankInfo, existingNames: Set<string>): 
     }
   }
 
+  const generatedName = generateShikona(beya, existingNames);
+  
   return {
     id: secureRandomInt(1000000).toString(36) + secureRandomInt(1000000).toString(36),
-    name: generateShikona(beya, existingNames),
+    name: generatedName.name,
+    nameKanji: generatedName.nameKanji,
     rank,
     beya,
     mawashiColor: ['Black', 'Blue', 'Green', 'Purple', 'Maroon'][secureRandomInt(5) - 1],

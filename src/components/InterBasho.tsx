@@ -5,6 +5,7 @@ import { performTrainingRoll, getTrainingThreshold, getStatUpgradeCost, isStatLi
 import { DIVISIONS } from '../constants/world';
 import { Zap, Heart, Trophy, ChevronRight, Check, Dice5, Coffee, Activity, Award, Edit3 } from 'lucide-react';
 import RecoveryResolution from './RecoveryResolution';
+import ShikonaBuilder from './ShikonaBuilder';
 
 interface InterBashoProps {
   rikishi: Rikishi;
@@ -33,6 +34,7 @@ export default function InterBasho({ rikishi, updateRikishi, onFinish }: InterBa
   const [localRikishi, setLocalRikishi] = useState<Rikishi>({ ...rikishi });
   const [spendSnapshot, setSpendSnapshot] = useState<Rikishi | null>(null);
   const [newName, setNewName] = useState(rikishi.name);
+  const [newNameKanji, setNewNameKanji] = useState(rikishi.nameKanji || '');
   const [rollResult, setRollResult] = useState<{ tp: number, rolls: number[] } | null>(null);
   const [recoveryLog, setRecoveryLog] = useState<string[]>([]);
 
@@ -174,6 +176,7 @@ export default function InterBasho({ rikishi, updateRikishi, onFinish }: InterBa
     setLocalRikishi(prev => ({
       ...prev,
       name: newName,
+      nameKanji: newNameKanji,
       hasRenamedAtCurrentRank: true
     }));
     
@@ -516,29 +519,22 @@ export default function InterBasho({ rikishi, updateRikishi, onFinish }: InterBa
                 </p>
               </div>
 
-              <div className="w-full max-w-xs space-y-4">
-                <div className="bg-white p-6 rounded-3xl shadow-sm border-2 border-sumo-beige">
-                  <span className="block text-[8px] font-black uppercase tracking-[0.2em] opacity-30 mb-2">New Shikona</span>
-                  <input
-                    type="text"
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    className="w-full text-2xl font-serif font-black italic text-center text-sumo-accent focus:outline-none placeholder:opacity-20"
-                    placeholder="Enter Name..."
-                  />
-                </div>
-                <button
-                  onClick={handleRenameSubmit}
-                  className="w-full bg-sumo-ink text-white py-4 rounded-2xl font-bold uppercase tracking-[0.3em] text-xs shadow-xl active:scale-95 transition-all"
-                >
-                  Adopt Sacred Name
-                </button>
-                <button
-                  onClick={() => setPhase('momentum')}
-                  className="text-[10px] font-bold uppercase tracking-widest opacity-40 hover:opacity-100"
-                >
-                  Keep Current Name
-                </button>
+              <div className="w-full max-w-sm space-y-4">
+                <ShikonaBuilder
+                  initialName={newName}
+                  initialKanji={newNameKanji}
+                  beya={localRikishi.beya}
+                  onComplete={(n, k) => {
+                    setLocalRikishi(prev => ({
+                      ...prev,
+                      name: n,
+                      nameKanji: k,
+                      hasRenamedAtCurrentRank: true
+                    }));
+                    setPhase('momentum');
+                  }}
+                  onCancel={() => setPhase('momentum')}
+                />
               </div>
             </motion.div>
           )}

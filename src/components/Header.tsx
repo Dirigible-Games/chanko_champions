@@ -34,7 +34,9 @@ export default function Header({ rikishi }: HeaderProps) {
         </div>
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-bold leading-tight uppercase tracking-tight">{rikishi.name}</h1>
+            <h1 className="text-lg font-bold leading-tight uppercase tracking-tight">
+              {rikishi.name} {rikishi.nameKanji && <span className="opacity-60 ml-1 font-serif text-base normal-case">({rikishi.nameKanji})</span>}
+            </h1>
             {rikishi.momentum.attribute && (
               <span className="text-[8px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-200 uppercase tracking-tighter flex items-center gap-0.5">
                 <Zap size={8} className="fill-orange-500" />

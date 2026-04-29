@@ -74,7 +74,7 @@ export default function WorldBrowser({ worldState }: WorldBrowserProps) {
                 </div>
                 <div className="flex flex-col items-start gap-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold">{r.name}</span>
+                    <span className="font-bold">{r.name} {r.nameKanji && <span className="opacity-60 ml-1 font-serif">({r.nameKanji})</span>}</span>
                     {!r.isNPC && (
                       <span className="text-[8px] bg-sumo-accent text-white px-1.5 py-0.5 rounded font-black uppercase tracking-wider">
                         You

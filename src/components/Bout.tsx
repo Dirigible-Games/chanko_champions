@@ -647,7 +647,9 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
       <div className="bg-sumo-ink p-3 flex justify-between items-center text-white shrink-0 z-10 shadow-md">
         {/* Left Side: Player */}
         <div className="flex flex-col items-start w-[38%]">
-           <span className="font-bold font-serif text-sm truncate w-full">{rikishi.name} <span className="opacity-60 italic text-xs ml-0.5">{abbreviateRank(rikishi.rank)}</span></span>
+           <span className="font-bold font-serif text-sm truncate w-full">
+             {rikishi.name} {rikishi.nameKanji && <span className="opacity-60 ml-0.5 font-serif text-xs normal-case">({rikishi.nameKanji})</span>} <span className="opacity-60 italic text-xs ml-0.5">{abbreviateRank(rikishi.rank)}</span>
+           </span>
            <div className="flex gap-1.5 mt-1 flex-wrap">
              <div className="flex items-center gap-0.5"><AttributeIcon attr="power" className="text-white opacity-80" size={10} /><span className="text-[10px] font-mono">{playerStats.power}</span></div>
              <div className="flex items-center gap-0.5"><AttributeIcon attr="balance" className="text-white opacity-80" size={10} /><span className="text-[10px] font-mono">{playerStats.balance}</span></div>
@@ -665,7 +667,9 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
 
         {/* Right Side: Opponent */}
         <div className="flex flex-col items-end w-[38%]">
-           <span className="font-bold font-serif text-sm truncate w-full text-right"><span className="opacity-60 italic text-xs mr-0.5">{abbreviateRank(opponent.rank)}</span> {opponent.name}</span>
+           <span className="font-bold font-serif text-sm truncate w-full text-right">
+             <span className="opacity-60 italic text-xs mr-0.5">{abbreviateRank(opponent.rank)}</span> {opponent.name} {opponent.nameKanji && <span className="opacity-60 ml-0.5 font-serif text-xs normal-case">({opponent.nameKanji})</span>}
+           </span>
            <div className="flex gap-1.5 mt-1 flex-wrap flex-row-reverse">
              <div className="flex items-center gap-0.5"><AttributeIcon attr="power" className="text-white opacity-80" size={10} /><span className="text-[10px] font-mono">{opponentStats.power}</span></div>
              <div className="flex items-center gap-0.5"><AttributeIcon attr="balance" className="text-white opacity-80" size={10} /><span className="text-[10px] font-mono">{opponentStats.balance}</span></div>
