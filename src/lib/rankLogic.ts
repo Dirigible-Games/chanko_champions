@@ -26,7 +26,7 @@ function getGlobalRankScore(rank: RankInfo): number {
   return offset + ((rank.title as number) * 2) - (rank.side === 'East' ? 1 : 0);
 }
 
-function getExpectedScore(rikishi: Rikishi): number {
+function getExpectedScore(rikishi: Rikishi, isYushoThisBasho: boolean): number {
    const { wins, losses, rank, careerHistory } = rikishi;
    const currentScore = getGlobalRankScore(rank);
    const netWins = wins - losses;
@@ -38,6 +38,22 @@ function getExpectedScore(rikishi: Rikishi): number {
       const isMakeKoshi = wins < 8; // Assuming 15 bouts
       const lastBasho = careerHistory[careerHistory.length - 1];
       const lastWasMakeKoshi = lastBasho && lastBasho.wins < lastBasho.losses;
+      
+      // Yokozuna promotion logic (2 Yusho in a row, or equivalent performance)
+      if (isYushoThisBasho) {
+         if (lastBasho && lastBasho.isYusho) {
+            return 0; // Yokozuna
+         }
+         // equivalent performance: e.g. 13+ wins
+         if (lastBasho && lastBasho.wins >= 13) {
+            return 0; // Yokozuna
+         }
+      } else if (wins >= 13) {
+         if (lastBasho && lastBasho.isYusho) {
+            return 0; // Yokozuna
+         }
+      }
+
       if (isMakeKoshi && lastWasMakeKoshi) return 4; // Demoted to Sekiwake
       return currentScore; // Stays Ozeki
    }
@@ -84,10 +100,10 @@ function getExpectedScore(rikishi: Rikishi): number {
    return expected;
 }
 
-export function reRankAllDivisions(allRikishi: Rikishi[]): Rikishi[] {
+export function reRankAllDivisions(allRikishi: Rikishi[], yushoWinners: Set<string> = new Set()): Rikishi[] {
     const scoredRikishi = allRikishi.map(r => ({
         rikishi: r,
-        expectedScore: getExpectedScore(r),
+        expectedScore: getExpectedScore(r, yushoWinners.has(r.id)),
         currentScore: getGlobalRankScore(r.rank)
     }));
 
@@ -100,13 +116,17 @@ export function reRankAllDivisions(allRikishi: Rikishi[]): Rikishi[] {
        return a.currentScore - b.currentScore;
     });
 
-    const yokozuna = scoredRikishi.filter(item => item.rikishi.rank.title === 'Yokozuna');
+    const yokozuna = scoredRikishi.filter(item => 
+        item.expectedScore === 0 || item.rikishi.rank.title === 'Yokozuna'
+    );
     const ozeki = scoredRikishi.filter(item => 
-        (item.rikishi.rank.title === 'Ozeki' && item.expectedScore <= 3) || 
-        (item.expectedScore === 3 && item.rikishi.rank.title !== 'Yokozuna')
+        ((item.rikishi.rank.title === 'Ozeki' && item.expectedScore <= 3) || 
+        (item.expectedScore === 3 && item.rikishi.rank.title !== 'Yokozuna')) &&
+        item.expectedScore !== 0
     );
 
     const generalPool = scoredRikishi.filter(item => 
+        item.expectedScore !== 0 &&
         item.rikishi.rank.title !== 'Yokozuna' && 
         !(item.rikishi.rank.title === 'Ozeki' && item.expectedScore <= 3) &&
         item.expectedScore !== 3 

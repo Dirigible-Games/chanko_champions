@@ -646,11 +646,14 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
       {/* Combat Info Bar (Moved above Dohyo) */}
       <div className="bg-sumo-ink p-3 flex justify-between items-center text-white shrink-0 z-10 shadow-md">
         {/* Left Side: Player */}
-        <div className="flex flex-col items-start w-[38%]">
-           <span className="font-bold font-serif text-sm truncate w-full">
-             {rikishi.name} {rikishi.nameKanji && <span className="opacity-60 ml-0.5 font-serif text-xs normal-case">({rikishi.nameKanji})</span>} <span className="opacity-60 italic text-xs ml-0.5">{abbreviateRank(rikishi.rank)}</span>
-           </span>
-           <div className="flex gap-1.5 mt-1 flex-wrap">
+        <div className="flex flex-col items-start w-[40%]">
+           <div className="flex flex-col min-w-0 w-full">
+             <span className="font-bold font-serif text-base truncate leading-tight">
+               {rikishi.name} {rikishi.nameKanji && <span className="opacity-60 ml-0.5 font-serif text-xs normal-case">({rikishi.nameKanji})</span>}
+             </span>
+             <span className="opacity-50 italic text-[10px] uppercase font-bold tracking-wider leading-none mt-0.5">{abbreviateRank(rikishi.rank)}</span>
+           </div>
+           <div className="flex gap-1.5 mt-2 flex-wrap">
              <div className="flex items-center gap-0.5"><AttributeIcon attr="power" className="text-white opacity-80" size={10} /><span className="text-[10px] font-mono">{playerStats.power}</span></div>
              <div className="flex items-center gap-0.5"><AttributeIcon attr="balance" className="text-white opacity-80" size={10} /><span className="text-[10px] font-mono">{playerStats.balance}</span></div>
              <div className="flex items-center gap-0.5"><AttributeIcon attr="footwork" className="text-white opacity-80" size={10} /><span className="text-[10px] font-mono">{playerStats.footwork}</span></div>
@@ -666,11 +669,14 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
         </div>
 
         {/* Right Side: Opponent */}
-        <div className="flex flex-col items-end w-[38%]">
-           <span className="font-bold font-serif text-sm truncate w-full text-right">
-             <span className="opacity-60 italic text-xs mr-0.5">{abbreviateRank(opponent.rank)}</span> {opponent.name} {opponent.nameKanji && <span className="opacity-60 ml-0.5 font-serif text-xs normal-case">({opponent.nameKanji})</span>}
-           </span>
-           <div className="flex gap-1.5 mt-1 flex-wrap flex-row-reverse">
+        <div className="flex flex-col items-end w-[40%]">
+           <div className="flex flex-col items-end min-w-0 w-full">
+             <span className="font-bold font-serif text-base truncate text-right leading-tight">
+               {opponent.name} {opponent.nameKanji && <span className="opacity-60 ml-0.5 font-serif text-xs normal-case">({opponent.nameKanji})</span>}
+             </span>
+             <span className="opacity-50 italic text-[10px] uppercase font-bold tracking-wider leading-none mt-0.5">{abbreviateRank(opponent.rank)}</span>
+           </div>
+           <div className="flex gap-1.5 mt-2 flex-wrap flex-row-reverse">
              <div className="flex items-center gap-0.5"><AttributeIcon attr="power" className="text-white opacity-80" size={10} /><span className="text-[10px] font-mono">{opponentStats.power}</span></div>
              <div className="flex items-center gap-0.5"><AttributeIcon attr="balance" className="text-white opacity-80" size={10} /><span className="text-[10px] font-mono">{opponentStats.balance}</span></div>
              <div className="flex items-center gap-0.5"><AttributeIcon attr="footwork" className="text-white opacity-80" size={10} /><span className="text-[10px] font-mono">{opponentStats.footwork}</span></div>
@@ -952,32 +958,40 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
                initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
                className={`grid grid-cols-1 gap-2 transition-opacity ${isRolling ? 'opacity-30 pointer-events-none' : ''}`}
              >
-                <div className="flex justify-between items-center mb-2 px-1">
-                   <div className="text-[10px] font-black uppercase tracking-widest opacity-30">Choose Tachiai</div>
-                   <div className="flex items-center gap-4">
-                      {/* Focus button */}
-                      <button 
-                        onClick={() => { setUseFocus(!useFocus); if (!useFocus) setUseFatigueDie(false); }}
-                        disabled={state.focusPoints < focusCost || isRolling || useFatigueDie}
-                        className={`flex items-center gap-1 transition-all ${useFocus ? 'opacity-100 scale-110' : 'opacity-40 grayscale hover:grayscale-0 hover:opacity-100'} ${state.focusPoints < focusCost ? 'opacity-10' : ''}`}
-                      >
-                        <Zap size={10} className={`${useFocus ? 'text-orange-500 fill-orange-500' : 'text-sumo-ink'}`} />
-                        <span className="text-[9px] font-bold uppercase">Focus ({state.focusPoints})</span>
-                      </button>
+                 <div className="flex justify-between items-center mb-2 px-1">
+                    <div className="text-[10px] font-black uppercase tracking-widest opacity-30">Choose Tachiai</div>
+                    <div className="flex items-center gap-2">
+                       {/* Focus button */}
+                       <button 
+                         onClick={() => { setUseFocus(!useFocus); if (!useFocus) setUseFatigueDie(false); }}
+                         disabled={state.focusPoints < focusCost || isRolling || useFatigueDie}
+                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all border shadow-sm ${
+                           useFocus 
+                             ? 'bg-orange-500 border-orange-600 text-white shadow-md scale-105' 
+                             : 'bg-white border-sumo-earth/30 text-sumo-ink/80 hover:bg-orange-50 hover:border-orange-200 hover:text-orange-700'
+                         } ${state.focusPoints < focusCost ? 'opacity-40 grayscale pointer-events-none' : ''}`}
+                       >
+                         <Zap size={12} className={`${useFocus ? 'text-white fill-white' : 'text-yellow-500 fill-yellow-500'}`} />
+                         <span className="text-[10px] font-black uppercase tracking-wider">Focus ({state.focusPoints})</span>
+                       </button>
 
-                      {/* Fatigue button */}
-                      {rikishi.rank.division !== 'Jonokuchi' && rikishi.rank.division !== 'Jonidan' && rikishi.rank.division !== 'Sandanme' && rikishi.rank.division !== 'Makushita' && (
-                        <button 
-                          onClick={() => { setUseFatigueDie(!useFatigueDie); if (!useFatigueDie) setUseFocus(false); }}
-                          disabled={state.fatigueDieUsed || isRolling || useFocus}
-                          className={`flex items-center gap-1 transition-all ${useFatigueDie ? 'opacity-100 scale-110' : 'opacity-40 grayscale hover:grayscale-0 hover:opacity-100'} ${state.fatigueDieUsed ? 'hidden' : ''}`}
-                        >
-                          <AlertCircle size={10} className={`${useFatigueDie ? 'text-red-500' : 'text-sumo-ink'}`} />
-                          <span className="text-[9px] font-bold uppercase">Fatigue</span>
-                        </button>
-                      )}
-                   </div>
-                </div>
+                       {/* Fatigue button */}
+                       {rikishi.rank.division !== 'Jonokuchi' && rikishi.rank.division !== 'Jonidan' && rikishi.rank.division !== 'Sandanme' && rikishi.rank.division !== 'Makushita' && !state.fatigueDieUsed && (
+                         <button 
+                           onClick={() => { setUseFatigueDie(!useFatigueDie); if (!useFatigueDie) setUseFocus(false); }}
+                           disabled={state.fatigueDieUsed || isRolling || useFocus}
+                           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all border shadow-sm ${
+                             useFatigueDie 
+                               ? 'bg-red-500 border-red-600 text-white shadow-md scale-105' 
+                               : 'bg-white border-sumo-earth/30 text-sumo-ink/80 hover:bg-red-50 hover:border-red-200 hover:text-red-700'
+                           }`}
+                         >
+                           <AlertCircle size={12} className={`${useFatigueDie ? 'text-white fill-white' : 'text-red-500 fill-red-500'}`} />
+                           <span className="text-[10px] font-black uppercase tracking-wider">Fatigue</span>
+                         </button>
+                       )}
+                    </div>
+                 </div>
                 <div className="flex flex-wrap gap-2">
                    {TACHIAI_MOVES.map(move => (
                      <div
@@ -1062,34 +1076,42 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
                initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
                className={`grid grid-cols-1 gap-2 transition-opacity ${isRolling ? 'opacity-30 pointer-events-none' : ''}`}
              >
-                <div className="flex justify-between items-center mb-2 px-1">
+                 <div className="flex justify-between items-center mb-2 px-1">
                    <div className="text-[10px] font-black uppercase tracking-widest opacity-30">
                      {state.attackerId === 'player' ? 'Choose Offense' : 'Choose Defense'}
                    </div>
-                    <div className="flex items-center gap-4">
-                      {/* Focus button */}
-                      <button 
-                        onClick={() => { setUseFocus(!useFocus); if (!useFocus) setUseFatigueDie(false); }}
-                        disabled={state.focusPoints < focusCost || isRolling || useFatigueDie}
-                        className={`flex items-center gap-1 transition-all ${useFocus ? 'opacity-100 scale-110' : 'opacity-40 grayscale hover:grayscale-0 hover:opacity-100'} ${state.focusPoints < focusCost ? 'opacity-10' : ''}`}
-                      >
-                        <Zap size={10} className={`${useFocus ? 'text-orange-500 fill-orange-500' : 'text-sumo-ink'}`} />
-                        <span className="text-[9px] font-bold uppercase">Focus ({state.focusPoints})</span>
-                      </button>
+                    <div className="flex items-center gap-2">
+                       {/* Focus button */}
+                       <button 
+                         onClick={() => { setUseFocus(!useFocus); if (!useFocus) setUseFatigueDie(false); }}
+                         disabled={state.focusPoints < focusCost || isRolling || useFatigueDie}
+                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all border shadow-sm ${
+                           useFocus 
+                             ? 'bg-orange-500 border-orange-600 text-white shadow-md scale-105' 
+                             : 'bg-white border-sumo-earth/30 text-sumo-ink/80 hover:bg-orange-50 hover:border-orange-200 hover:text-orange-700'
+                         } ${state.focusPoints < focusCost ? 'opacity-40 grayscale pointer-events-none' : ''}`}
+                       >
+                         <Zap size={12} className={`${useFocus ? 'text-white fill-white' : 'text-yellow-500 fill-yellow-500'}`} />
+                         <span className="text-[10px] font-black uppercase tracking-wider">Focus ({state.focusPoints})</span>
+                       </button>
 
-                      {/* Fatigue button */}
-                      {rikishi.rank.division !== 'Jonokuchi' && rikishi.rank.division !== 'Jonidan' && rikishi.rank.division !== 'Sandanme' && rikishi.rank.division !== 'Makushita' && (
-                        <button 
-                          onClick={() => { setUseFatigueDie(!useFatigueDie); if (!useFatigueDie) setUseFocus(false); }}
-                          disabled={state.fatigueDieUsed || isRolling || useFocus}
-                          className={`flex items-center gap-1 transition-all ${useFatigueDie ? 'opacity-100 scale-110' : 'opacity-40 grayscale hover:grayscale-0 hover:opacity-100'} ${state.fatigueDieUsed ? 'hidden' : ''}`}
-                        >
-                          <AlertCircle size={10} className={`${useFatigueDie ? 'text-red-500' : 'text-sumo-ink'}`} />
-                          <span className="text-[9px] font-bold uppercase">Fatigue</span>
-                        </button>
-                      )}
-                   </div>
-                </div>
+                       {/* Fatigue button */}
+                       {rikishi.rank.division !== 'Jonokuchi' && rikishi.rank.division !== 'Jonidan' && rikishi.rank.division !== 'Sandanme' && rikishi.rank.division !== 'Makushita' && !state.fatigueDieUsed && (
+                         <button 
+                           onClick={() => { setUseFatigueDie(!useFatigueDie); if (!useFatigueDie) setUseFocus(false); }}
+                           disabled={state.fatigueDieUsed || isRolling || useFocus}
+                           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all border shadow-sm ${
+                             useFatigueDie 
+                               ? 'bg-red-500 border-red-600 text-white shadow-md scale-105' 
+                               : 'bg-white border-sumo-earth/30 text-sumo-ink/80 hover:bg-red-50 hover:border-red-200 hover:text-red-700'
+                           }`}
+                         >
+                           <AlertCircle size={12} className={`${useFatigueDie ? 'text-white fill-white' : 'text-red-500 fill-red-500'}`} />
+                           <span className="text-[10px] font-black uppercase tracking-wider">Fatigue</span>
+                         </button>
+                       )}
+                    </div>
+                 </div>
                 <div className="grid grid-cols-2 gap-1.5 overflow-hidden">
                    {(state.attackerId === 'player' ? 
                      OFFENSIVE_MOVES.filter(m => m.stanceRequirement === state.playerStance) : 

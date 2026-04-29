@@ -31,7 +31,36 @@ import {
   applyInjury,
 } from "./lib/gameLogic";
 
+import React from 'react';
+
+class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error: Error | null}> {
+  constructor(props: {children: React.ReactNode}) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) { return { hasError: true, error }; }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{padding: '24px', background: '#fff', color: 'red'}}>
+          <h2>Crash occurred!</h2>
+          <pre>{this.state.error?.stack}</pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppContent />
+    </ErrorBoundary>
+  );
+}
+
+function AppContent() {
   const [showSettings, setShowSettings] = useState(false);
   const [isDevMode, setIsDevMode] = useState(() => localStorage.getItem('chanko_dev_mode') === 'true');
   const [showDevEditor, setShowDevEditor] = useState(false);

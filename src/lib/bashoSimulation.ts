@@ -242,6 +242,8 @@ export function simulateBashoEnd(
   });
 
   const divisions = DIVISIONS.map((d) => d.name);
+  let yushoWinners = new Set<string>();
+  
   divisions.forEach((divName) => {
     const divisionRikishi = rikishiWithRecords.filter(
       (r) => r.rank.division === divName,
@@ -287,19 +289,8 @@ export function simulateBashoEnd(
 
     // Refresh winner reference in case it was modified by simulateFullBout
     winner = rikishiWithRecords.find(r => r.id === winner.id) || winner;
+    yushoWinners.add(winner.id);
 
-    winner.careerHistory = [
-      ...(winner.careerHistory || []),
-      {
-        year: worldState.currentYear,
-        month: worldState.currentMonth.toString(),
-        rank: winner.rank,
-        wins: winner.wins,
-        losses: winner.losses,
-        isYusho: true,
-        isJunYusho: false,
-      },
-    ];
     newsForThisMonth.push({
       id: secureRandomInt(1000000).toString(36),
       year: worldState.currentYear,
@@ -345,7 +336,7 @@ export function simulateBashoEnd(
   }
 
   // Re-rank everyone globally
-  const rerankedAll = reRankAllDivisions(activeRikishiList);
+  const rerankedAll = reRankAllDivisions(activeRikishiList, yushoWinners);
 
   const finalRikishiList: Rikishi[] = [];
 
@@ -356,28 +347,20 @@ export function simulateBashoEnd(
     
     const oldFormatted = formatRank(oldRank);
     const newFormatted = formatRank(r.rank);
-    const isYusho =
-      r.careerHistory?.length > 0 &&
-      r.careerHistory[r.careerHistory.length - 1].year ===
-        worldState.currentYear &&
-      r.careerHistory[r.careerHistory.length - 1].month ===
-        worldState.currentMonth.toString() &&
-      r.careerHistory[r.careerHistory.length - 1].isYusho;
+    const isYusho = yushoWinners.has(r.id);
 
-    if (!isYusho) {
-      r.careerHistory = [
-        ...(r.careerHistory || []),
-        {
-          year: worldState.currentYear,
-          month: worldState.currentMonth.toString(),
-          rank: oldRank, // Use the actual rank they competed at
-          wins: r.wins,
-          losses: r.losses,
-          isYusho: false,
-          isJunYusho: false,
-        },
-      ];
-    }
+    r.careerHistory = [
+      ...(r.careerHistory || []),
+      {
+        year: worldState.currentYear,
+        month: worldState.currentMonth.toString(),
+        rank: oldRank, // Use the actual rank they competed at
+        wins: r.wins,
+        losses: r.losses,
+        isYusho: isYusho,
+        isJunYusho: false,
+      },
+    ];
 
     if (oldFormatted !== newFormatted) {
       const isDemotion = r.wins < bouts / 2;

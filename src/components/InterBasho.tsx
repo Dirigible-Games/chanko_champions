@@ -524,17 +524,34 @@ export default function InterBasho({ rikishi, updateRikishi, onFinish }: InterBa
                   initialName={newName}
                   initialKanji={newNameKanji}
                   beya={localRikishi.beya}
-                  onComplete={(n, k) => {
-                    setLocalRikishi(prev => ({
-                      ...prev,
-                      name: n,
-                      nameKanji: k,
-                      hasRenamedAtCurrentRank: true
-                    }));
-                    setPhase('momentum');
+                  onChange={(n, k) => {
+                    setNewName(n);
+                    setNewNameKanji(k);
                   }}
-                  onCancel={() => setPhase('momentum')}
                 />
+                <div className="flex gap-3 w-full">
+                  <button
+                    onClick={() => setPhase('momentum')}
+                    className="flex-1 py-3 text-sm font-bold uppercase tracking-widest text-sumo-ink/60 bg-sumo-earth/10 rounded-xl hover:bg-sumo-earth/20 transition-colors"
+                  >
+                    Keep Original
+                  </button>
+                  <button
+                    onClick={() => {
+                      setLocalRikishi(prev => ({
+                        ...prev,
+                        name: newName,
+                        nameKanji: newNameKanji,
+                        hasRenamedAtCurrentRank: true
+                      }));
+                      setPhase('momentum');
+                    }}
+                    disabled={!newName.trim()}
+                    className="flex-1 py-3 text-sm font-bold uppercase tracking-widest text-white bg-sumo-ink rounded-xl shadow-lg hover:bg-sumo-ink/90 disabled:opacity-50 transition-all font-serif"
+                  >
+                    Confirm Name
+                  </button>
+                </div>
               </div>
             </motion.div>
           )}
