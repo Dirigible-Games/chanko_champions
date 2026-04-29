@@ -177,7 +177,12 @@ export function reRankAllDivisions(allRikishi: Rikishi[]): Rikishi[] {
         poolIndex++;
     }
 
-    for (let i = 0; i < 260; i++) {
+    const currentJonokuchiSize = allRikishi.filter(r => r.rank.division === 'Jonokuchi').length;
+    const remainingForBottomTwo = generalPool.length - poolIndex;
+    let targetJonidanSize = remainingForBottomTwo - currentJonokuchiSize;
+    if (targetJonidanSize < 0) targetJonidanSize = remainingForBottomTwo;
+
+    for (let i = 0; i < targetJonidanSize; i++) {
         if (poolIndex >= generalPool.length) break;
         const jdTitle = Math.floor(i / 2) + 1;
         generalPool[poolIndex].rikishi.rank = { division: 'Jonidan', title: jdTitle, side: i % 2 === 0 ? 'East' : 'West' };

@@ -82,7 +82,8 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
     hasInjuryTrigger: false
   });
 
-  const [phase, setPhase] = useState<'tachiai' | 'stance_selection' | 'combat' | 'result'>('tachiai');
+  const [monoiiData, setMonoiiData] = useState<{result: 'attacker'|'rematch'|'defender', roll: number, winnerId: 'player'|'opponent'} | null>(null);
+  const [phase, setPhase] = useState<'tachiai' | 'stance_selection' | 'combat' | 'monoii' | 'result'>('tachiai');
   const [animStep, setAnimStep] = useState<'idle' | 'names' | 'stats' | 'bonuses' | 'dice_info' | 'rolling' | 'done'>('idle');
   const [playerTally, setPlayerTally] = useState(0);
   const [opponentTally, setOpponentTally] = useState(0);
@@ -292,7 +293,7 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
           setState(prev => ({ ...prev, round: 2 }));
           setPhase('stance_selection');
         } else {
-          const nextStance = nextStances[secureRandomInt(nextStances.length) - 1];
+          const nextStance = nextStances[secureRandomInt(nextStances.length)];
           const winnerName = winner === 'player' ? rikishi.name : opponent.name;
           addLog(`${winnerName} transitions into ${nextStance} stance.`);
           
@@ -504,29 +505,8 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
         if (isMonoiiEligible) {
           addLog("MONO-II!");
           const monoiiResult = performMonoii();
-          if (monoiiResult === 'attacker') {
-            addLog("Ruling stands.");
-            resolveVictory();
-          } else if (monoiiResult === 'rematch') {
-            addLog("TORINAOSHI!");
-            setState(prev => ({ ...prev, round: prev.round + 1 }));
-            setPhase('tachiai');
-            setIsRolling(false);
-            setSelectedMove(null);
-            setOpponentMove(null);
-            setShowDice(null);
-          } else {
-            addLog("Ruling reversed!");
-            const winnerId = 'opponent';
-             setState(prev => ({
-             ...prev,
-             isFinished: true,
-             winnerId,
-             victoryKimarite: 'Sashichigae',
-             logs: [...prev.logs, `${opponent.name} wins by reversal!`]
-           }));
-           setPhase('result');
-          }
+          setMonoiiData({ result: monoiiResult.result, roll: monoiiResult.roll, winnerId: isPlayerAttacking ? 'player' : 'opponent' });
+          setPhase('monoii');
         } else {
           resolveVictory();
         }
@@ -552,7 +532,7 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
           setState(prev => ({ ...prev, round: prev.round + 1 }));
           setPhase('stance_selection');
         } else {
-          const nextStance = nextStances[secureRandomInt(nextStances.length) - 1];
+          const nextStance = nextStances[secureRandomInt(nextStances.length)];
           const defenderName = isPlayerAttacking ? opponent.name : rikishi.name;
           addLog(`${defenderName} transitions into ${nextStance} stance.`);
           
@@ -570,6 +550,43 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
         }
       }
     }, 8500); // 8500ms timeout to wait for the sequence
+  };
+
+  const handleMonoiiResolution = () => {
+    if (!monoiiData) return;
+    const isPlayerAttacking = monoiiData.winnerId === 'player';
+    
+    if (monoiiData.result === 'attacker') {
+       addLog("Ruling stands.");
+       setState(prev => ({
+         ...prev,
+         isFinished: true,
+         winnerId: monoiiData.winnerId,
+         victoryKimarite: isPlayerAttacking ? selectedMove!.name : opponentMove!.name,
+         logs: [...prev.logs, `${monoiiData.winnerId === 'player' ? rikishi.name : opponent.name} wins by ${isPlayerAttacking ? selectedMove!.name : opponentMove!.name}!`]
+       }));
+       setPhase('result');
+    } else if (monoiiData.result === 'rematch') {
+       addLog("TORINAOSHI!");
+       setState(prev => ({ ...prev, round: prev.round + 1 }));
+       setPhase('tachiai');
+       setIsRolling(false);
+       setSelectedMove(null);
+       setOpponentMove(null);
+       setShowDice(null);
+    } else {
+       addLog("Ruling reversed!");
+       const reversedWinnerId = monoiiData.winnerId === 'player' ? 'opponent' : 'player';
+       setState(prev => ({
+         ...prev,
+         isFinished: true,
+         winnerId: reversedWinnerId,
+         victoryKimarite: 'Sashichigae',
+         logs: [...prev.logs, `${reversedWinnerId === 'player' ? rikishi.name : opponent.name} wins by reversal!`]
+       }));
+       setPhase('result');
+    }
+    setMonoiiData(null);
   };
 
   return (
@@ -1062,6 +1079,47 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
                 </div>
              </motion.div>
           )}
+
+           {phase === 'monoii' && monoiiData && (
+              <motion.div 
+                key="monoii" 
+                initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+                className="text-center space-y-4 px-4 pt-4 pb-6 h-full flex flex-col justify-center bg-sumo-soft border-t border-sumo-earth/30"
+              >
+                <div className="flex flex-col items-center">
+                  <div className="bg-red-800 text-white px-3 py-1 rounded text-[10px] font-black uppercase tracking-widest shadow-md">
+                    MONO-II
+                  </div>
+                  <h3 className="text-xl font-serif font-black italic tracking-wide uppercase text-sumo-ink mt-3">
+                    Shinpan Deliberation
+                  </h3>
+                  <p className="text-xs text-sumo-ink/70 mt-1 max-w-[260px]">
+                    The judges have gathered to review the outcome of the exchange.
+                  </p>
+                </div>
+
+                <div className="flex flex-col items-center justify-center my-4 bg-white/70 py-4 rounded-xl border border-sumo-earth/40 shadow-inner">
+                   <div className="text-[10px] font-black uppercase tracking-widest text-sumo-ink/50 mb-2">Shinpan's Roll (1d10)</div>
+                   <div className="w-16 h-16 bg-white border-2 border-sumo-ink rounded-lg shadow-md flex items-center justify-center font-serif text-3xl font-black text-sumo-ink">
+                     {monoiiData.roll}
+                   </div>
+                   <div className="mt-3 text-sm font-bold uppercase tracking-widest text-red-800">
+                     {monoiiData.result === 'attacker' && "Ruling Stands"}
+                     {monoiiData.result === 'defender' && "Ruling Reversed"}
+                     {monoiiData.result === 'rematch' && "Torinaoshi (Rematch)"}
+                   </div>
+                </div>
+
+                <div className="w-full max-w-[280px] mx-auto">
+                   <button
+                    onClick={handleMonoiiResolution}
+                    className="w-full bg-[#362624] text-white py-3.5 rounded-lg font-bold uppercase tracking-[0.15em] text-xs shadow-md shadow-black/20 hover:bg-black active:scale-95 transition-all outline-none"
+                  >
+                    Acknowledge
+                  </button>
+                </div>
+              </motion.div>
+           )}
 
            {phase === 'result' && (
              <motion.div 

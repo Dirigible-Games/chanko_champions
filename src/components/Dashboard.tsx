@@ -1,17 +1,20 @@
+import { useState } from 'react';
 import { motion } from 'motion/react';
 import { Rikishi } from '../types';
 import { ChevronRight, Calendar, Trophy, Zap, Dumbbell, Activity, Target, ShieldAlert, Flag } from 'lucide-react';
 import { getEffectiveBaseDie, getBaseInjuryThreshold, getFatigueThresholdReduction, getEffectiveStats } from '../lib/gameLogic';
 import { AttributeIcon } from './AttributeIcon';
-import type { AttributeKey } from '../types';
+import type { AttributeKey, WorldState } from '../types';
 import { DIVISIONS } from '../constants/world';
 
 interface DashboardProps {
   rikishi: Rikishi;
+  worldState?: WorldState | null;
   onAction?: (action: string) => void;
 }
 
 export default function Dashboard({ rikishi, onAction }: DashboardProps) {
+  const [showWithdrawConfirm, setShowWithdrawConfirm] = useState(false);
   const baseDie = getEffectiveBaseDie(rikishi);
   const injuryThreshold = getBaseInjuryThreshold(rikishi.bashosCompleted) - getFatigueThresholdReduction(rikishi.fatigue);
   const effectiveStats = getEffectiveStats(rikishi);
@@ -109,12 +112,22 @@ export default function Dashboard({ rikishi, onAction }: DashboardProps) {
 
         {/* Primary Action - Compacted */}
         <div className="mt-auto space-y-2">
-          <button 
-            onClick={() => onAction?.('leaderboard')}
-            className="w-full bg-sumo-earth/10 text-sumo-ink p-2 rounded-xl font-bold uppercase tracking-widest text-[10px] active:scale-95 transition-all text-center"
-          >
-            Check Division Leaderboard
-          </button>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => onAction?.('leaderboard')}
+              className="flex-1 bg-sumo-earth/10 text-sumo-ink p-2 rounded-xl font-bold uppercase tracking-widest text-[10px] active:scale-95 transition-all text-center"
+            >
+              Leaderboard
+            </button>
+            {!isBashoComplete && (
+              <button 
+                onClick={() => setShowWithdrawConfirm(true)}
+                className="flex-1 bg-sumo-accent/10 text-sumo-accent p-2 rounded-xl font-bold uppercase tracking-widest text-[10px] active:scale-95 transition-all text-center"
+              >
+                Withdraw
+              </button>
+            )}
+          </div>
           
           <div className="text-center flex justify-between items-center bg-sumo-earth/5 px-3 py-1.5 rounded-lg text-[8px] font-bold uppercase tracking-widest text-sumo-ink/60">
             <span>Bouts</span>
@@ -144,6 +157,46 @@ export default function Dashboard({ rikishi, onAction }: DashboardProps) {
           )}
         </div>
       </div>
+
+      {showWithdrawConfirm && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-6">
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-sumo-paper w-full max-w-sm rounded-[2rem] overflow-hidden shadow-2xl relative border-2 border-sumo-earth/20"
+          >
+            <div className="p-8 pb-6">
+              <div className="bg-sumo-accent/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                 <ShieldAlert className="text-sumo-accent" size={32} />
+              </div>
+              
+              <h2 className="text-2xl font-serif font-bold text-center text-sumo-ink mb-2">Withdraw?</h2>
+              
+              <p className="text-sumo-ink/70 text-sm text-center leading-relaxed">
+                Are you sure you want to withdraw from the rest of the basho? You will forfeit all remaining bouts and take a loss for each one.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 divide-x divide-sumo-earth/20 border-t border-sumo-earth/20">
+              <button 
+                onClick={() => setShowWithdrawConfirm(false)}
+                className="py-4 text-sm font-bold text-sumo-ink/60 uppercase tracking-widest hover:bg-sumo-ink/5 transition-colors active:bg-sumo-ink/10"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => {
+                  setShowWithdrawConfirm(false);
+                  onAction?.('kyujo');
+                }}
+                className="py-4 text-sm font-bold text-sumo-accent uppercase tracking-widest hover:bg-sumo-accent/5 transition-colors active:bg-sumo-accent/10"
+              >
+                Confirm
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

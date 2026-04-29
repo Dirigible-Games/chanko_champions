@@ -14,6 +14,8 @@ import {
   applyInjury,
   performInjuryRoll,
   performRecoveryRoll,
+  evaluateKyujo,
+  evaluateRetirement
 } from "./gameLogic";
 import {
   calculateRankChange,
@@ -23,69 +25,110 @@ import {
 } from "./rankLogic";
 import { calculateMomentumPoints } from "./gameLogic";
 import { simulateFullBout } from "./combatEngine";
+import { generateNPCRikishi } from "./worldGeneration";
 
 export function simulateAllBoutsForDay(
   schedule: BoutPairing[],
   allRikishi: Rikishi[],
   day: number,
   playerRikishiId?: string,
+  onInjuryCallback?: (rikishi: Rikishi, severity: number, attr: AttributeKey, day: number) => void
 ): Rikishi[] {
   const rikishiMap = new Map(allRikishi.map((r) => [r.id, { ...r }]));
   const dayBouts = schedule.filter((p) => p.day === day);
 
   for (const bout of dayBouts) {
-    if (
-      bout.rikishiId1 === playerRikishiId ||
-      bout.rikishiId2 === playerRikishiId
-    )
-      continue;
-
     const r1 = rikishiMap.get(bout.rikishiId1);
     const r2 = rikishiMap.get(bout.rikishiId2);
 
+    if (
+      (bout.rikishiId1 === playerRikishiId && r1?.status !== 'kyujo') ||
+      (bout.rikishiId2 === playerRikishiId && r2?.status !== 'kyujo')
+    ) {
+      continue;
+    }
+
     if (r1 && r2 && !bout.result) {
+      const isR1Kyujo = r1.status === 'kyujo' || evaluateKyujo(r1);
+      const isR2Kyujo = r2.status === 'kyujo' || evaluateKyujo(r2);
+
+      if (isR1Kyujo && r1.status !== 'kyujo') r1.status = 'kyujo';
+      if (isR2Kyujo && r2.status !== 'kyujo') r2.status = 'kyujo';
+
+      if (isR1Kyujo && isR2Kyujo) {
+        // Both absent, both get a loss, no winner
+        r1.losses += 1;
+        r2.losses += 1;
+        bout.result = 'draw';
+        rikishiMap.set(r1.id, r1);
+        rikishiMap.set(r2.id, r2);
+        continue;
+      } else if (isR1Kyujo) {
+        // R1 absent, R2 wins by default
+        r1.losses += 1;
+        r2.wins += 1;
+        r2.boutsFoughtThisBasho = (r2.boutsFoughtThisBasho || 0) + 1;
+        bout.result = 'rikishiId2';
+        rikishiMap.set(r1.id, r1);
+        rikishiMap.set(r2.id, r2);
+        continue;
+      } else if (isR2Kyujo) {
+        // R2 absent, R1 wins by default
+        r2.losses += 1;
+        r1.wins += 1;
+        r1.boutsFoughtThisBasho = (r1.boutsFoughtThisBasho || 0) + 1;
+        bout.result = 'rikishiId1';
+        rikishiMap.set(r1.id, r1);
+        rikishiMap.set(r2.id, r2);
+        continue;
+      }
+
       const result = simulateFullBout(r1, r2);
       result.updatedR1.wins += result.winnerId === r1.id ? 1 : 0;
       result.updatedR1.losses += result.winnerId === r1.id ? 0 : 1;
+      result.updatedR1.boutsFoughtThisBasho = (result.updatedR1.boutsFoughtThisBasho || 0) + 1;
       result.updatedR2.wins += result.winnerId === r2.id ? 1 : 0;
       result.updatedR2.losses += result.winnerId === r2.id ? 0 : 1;
+      result.updatedR2.boutsFoughtThisBasho = (result.updatedR2.boutsFoughtThisBasho || 0) + 1;
 
       if (result.hasInjury1) {
-        const attrs: AttributeKey[] = [
-          "power",
-          "balance",
-          "footwork",
-          "technique",
-          "spirit",
-        ];
-        const attr = attrs[secureRandomInt(attrs.length) - 1];
+        const attrs: AttributeKey[] = ["power", "balance", "footwork", "technique", "spirit"];
         const severityResult = performInjuryRoll(result.updatedR1.fatigue);
-        if (severityResult.results.length > 0) {
+        
+        let targetAttr: AttributeKey | null = null;
+        if (result.updatedR1.fatigue < 60) {
+          targetAttr = attrs[secureRandomInt(attrs.length)];
+        }
+
+        severityResult.results.forEach(res => {
+          const attr = targetAttr || attrs[secureRandomInt(attrs.length)];
           result.updatedR1 = applyInjury(
             result.updatedR1,
-            severityResult.results[0].severity,
-            attr,
+            res.severity,
+            attr
           );
-        }
+          if (onInjuryCallback) onInjuryCallback(result.updatedR1, res.severity, attr, day);
+        });
       }
 
       if (result.hasInjury2) {
-        const attrs: AttributeKey[] = [
-          "power",
-          "balance",
-          "footwork",
-          "technique",
-          "spirit",
-        ];
-        const attr = attrs[secureRandomInt(attrs.length) - 1];
+        const attrs: AttributeKey[] = ["power", "balance", "footwork", "technique", "spirit"];
         const severityResult = performInjuryRoll(result.updatedR2.fatigue);
-        if (severityResult.results.length > 0) {
+        
+        let targetAttr: AttributeKey | null = null;
+        if (result.updatedR2.fatigue < 60) {
+          targetAttr = attrs[secureRandomInt(attrs.length)];
+        }
+
+        severityResult.results.forEach(res => {
+          const attr = targetAttr || attrs[secureRandomInt(attrs.length)];
           result.updatedR2 = applyInjury(
             result.updatedR2,
-            severityResult.results[0].severity,
-            attr,
+            res.severity,
+            attr
           );
-        }
+          if (onInjuryCallback) onInjuryCallback(result.updatedR2, res.severity, attr, day);
+        });
       }
 
       bout.result = result.winnerId === r1.id ? "rikishiId1" : "rikishiId2";
@@ -136,6 +179,23 @@ export function simulateBashoEnd(
         currentRikishiList,
         d,
         playerRikishi.id,
+        (rikishi, severity, attr, day) => {
+          if (rikishi.rank.division === "Makuuchi") {
+            const isHighRankTitle = typeof rikishi.rank.title === 'string' && ['Yokozuna', 'Ozeki', 'Sekiwake', 'Komusubi'].includes(rikishi.rank.title);
+            const isHighMaegashira = typeof rikishi.rank.title === 'number' && rikishi.rank.title <= 5;
+            
+            if (severity > 0 && (isHighRankTitle || isHighMaegashira)) {
+               newsForThisMonth.push({
+                 id: secureRandomInt(1000000).toString(36),
+                 year: worldState.currentYear,
+                 month: worldState.currentMonth,
+                 type: "general",
+                 division: rikishi.rank.division,
+                 text: `${rikishi.name} (${abbreviateRank(rikishi.rank)}) was injured on Day ${day} in a bout!`
+               });
+            }
+          }
+        }
       );
     }
   }
@@ -149,8 +209,22 @@ export function simulateBashoEnd(
 
     if (r.isNPC) {
       r.bashosCompleted += 1;
-      // Slightly toned down stat growth: 1-3 instead of 1-4
-      const tpEarned = secureRandomInt(2) + 1; 
+      
+      let tpEarned = 0;
+      if (r.bashosCompleted >= 20) {
+        tpEarned = 2;
+      } else {
+        const divInfo = DIVISIONS.find(d => d.name === r.rank.division);
+        const boutsScheduled = divInfo ? divInfo.bouts : 15;
+        const participated = r.boutsFoughtThisBasho || 0;
+        
+        if (r.status === 'kyujo' && participated < boutsScheduled / 2) {
+          tpEarned = 0;
+        } else {
+          tpEarned = secureRandomInt(2) + 1; // 1-3
+        }
+      }
+
       const attrs: AttributeKey[] = [
         "power",
         "balance",
@@ -159,7 +233,7 @@ export function simulateBashoEnd(
         "spirit",
       ];
       for (let i = 0; i < tpEarned; i++) {
-        const attr = attrs[secureRandomInt(attrs.length) - 1];
+        const attr = attrs[secureRandomInt(attrs.length)];
         r.stats[attr] += 1;
       }
       r.fatigue = Math.max(0, r.fatigue - 40);
@@ -173,8 +247,47 @@ export function simulateBashoEnd(
       (r) => r.rank.division === divName,
     );
     if (divisionRikishi.length === 0) return;
-    divisionRikishi.sort((a, b) => b.wins - a.wins);
-    const winner = divisionRikishi[0];
+    
+    // Determine the highest win count
+    const maxWins = Math.max(...divisionRikishi.map(r => r.wins));
+    const tiedRikishi = divisionRikishi.filter(r => r.wins === maxWins);
+
+    let winner = tiedRikishi[0];
+    
+    if (tiedRikishi.length > 1) {
+      newsForThisMonth.push({
+        id: secureRandomInt(1000000).toString(36),
+        year: worldState.currentYear,
+        month: worldState.currentMonth,
+        type: "general",
+        division: divName,
+        text: `A ${tiedRikishi.length}-way playoff is occurring in ${divName} to decide the Yusho!`,
+      });
+      
+      let remaining = [...tiedRikishi];
+      while (remaining.length > 1) {
+        // Randomly pick two
+        remaining.sort(() => secureRandom() - 0.5);
+        const r1Index = rikishiWithRecords.findIndex(r => r.id === remaining[0].id);
+        const r2Index = rikishiWithRecords.findIndex(r => r.id === remaining[1].id);
+        
+        const result = simulateFullBout(rikishiWithRecords[r1Index], rikishiWithRecords[r2Index]);
+        
+        // Save the updated health/fatigue back
+        rikishiWithRecords[r1Index] = result.updatedR1;
+        rikishiWithRecords[r2Index] = result.updatedR2;
+
+        let boutWinnerId = result.winnerId;
+        let boutLoserId = boutWinnerId === remaining[0].id ? remaining[1].id : remaining[0].id;
+
+        remaining = remaining.filter(r => r.id !== boutLoserId);
+      }
+      winner = remaining[0];
+    }
+
+    // Refresh winner reference in case it was modified by simulateFullBout
+    winner = rikishiWithRecords.find(r => r.id === winner.id) || winner;
+
     winner.careerHistory = [
       ...(winner.careerHistory || []),
       {
@@ -198,8 +311,41 @@ export function simulateBashoEnd(
     });
   });
 
+  // Evaluate retirements and reset kyujo status
+  let retiredCount = 0;
+  const activeRikishiList = rikishiWithRecords.filter(r => {
+     if (r.id === playerRikishi.id) {
+         if (r.status === 'kyujo') r.status = 'active';
+         return true; 
+     }
+     
+     if (evaluateRetirement(r)) {
+         newsForThisMonth.push({
+            id: secureRandomInt(1000000).toString(36),
+            year: worldState.currentYear,
+            month: worldState.currentMonth,
+            type: 'retirement',
+            text: `${abbreviateRank(r.rank)} ${r.name} has announced their retirement.`,
+            division: r.rank.division
+         });
+         retiredCount++;
+         return false; // filtered out
+     }
+     
+     if (r.status === 'kyujo') r.status = 'active';
+     return true;
+  });
+
+  if (retiredCount > 0) {
+    const existingNames = new Set<string>(activeRikishiList.map(r => r.name));
+    for (let i = 0; i < retiredCount; i++) {
+      const newRookie = generateNPCRikishi({ division: 'Jonokuchi', title: 99, side: 'East' }, existingNames);
+      activeRikishiList.push(newRookie);
+    }
+  }
+
   // Re-rank everyone globally
-  const rerankedAll = reRankAllDivisions(rikishiWithRecords);
+  const rerankedAll = reRankAllDivisions(activeRikishiList);
 
   const finalRikishiList: Rikishi[] = [];
 

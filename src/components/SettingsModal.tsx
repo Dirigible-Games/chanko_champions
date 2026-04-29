@@ -91,7 +91,33 @@ export default function SettingsModal({ onClose, onMainMenu, onExit }: SettingsM
             />
           </div>
 
-          <div className="pt-4 space-y-3 border-t border-sumo-earth/20 mt-4">
+          {/* Dev Mode Toggle */}
+          <div className="flex items-center justify-between border-t border-sumo-earth/20 pt-6">
+            <div className="flex items-center gap-2 font-bold text-sm uppercase tracking-widest opacity-80 text-sumo-ink">
+              Developer Options
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input 
+                type="checkbox" 
+                className="sr-only peer"
+                checked={localStorage.getItem('chanko_dev_mode') === 'true'}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    localStorage.setItem('chanko_dev_mode', 'true');
+                  } else {
+                    localStorage.removeItem('chanko_dev_mode');
+                  }
+                  // Force a re-render to update the toggle visual immediately
+                  setSoundVolume(v => v);
+                  // Dispatch custom event so App.tsx can update
+                  window.dispatchEvent(new Event('chanko_dev_mode_change'));
+                }}
+              />
+              <div className="w-11 h-6 bg-sumo-earth/30 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sumo-accent"></div>
+            </label>
+          </div>
+
+          <div className="pt-4 space-y-3 border-t border-sumo-earth/20 mt-2">
             <button 
               onClick={toggleFullscreen}
               className="w-full py-4 px-4 bg-white border border-sumo-earth/20 rounded-xl font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2 hover:bg-sumo-soft shadow-sm transition-colors text-sumo-ink active:scale-95"

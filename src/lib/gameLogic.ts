@@ -1,4 +1,5 @@
-import { RikishiStats, AttributeKey, Rikishi, Specialization, RankInfo } from '../types';
+import { RikishiStats, AttributeKey, Rikishi, Specialization, RankInfo, CareerRecord } from '../types';
+import { TACHIAI_MOVES, OFFENSIVE_MOVES } from '../constants/combat';
 
 /**
  * Validates the Rikishi stat line based on the rule: 
@@ -118,6 +119,51 @@ export function getFatigueThresholdReduction(fatigue: number): number {
 }
 
 /**
+ * Evaluates whether an NPC should go Kyujo.
+ */
+export function evaluateKyujo(rikishi: Rikishi): boolean {
+  if (rikishi.status === 'kyujo' || rikishi.status === 'retired') return true;
+  if (!rikishi.isNPC) return false; // Players must explicitly withdraw
+
+  const injuries = Object.values(rikishi.injuries);
+  const maxSeverity = Math.max(0, ...injuries.map(i => i.severity));
+
+  if (maxSeverity >= 3) return true;
+  if (maxSeverity === 2 && secureRandom() < 0.25) return true;
+  
+  // High fatigue increases chance of opting for rest
+  if (rikishi.fatigue > 95 && secureRandom() < 0.8) return true;
+  if (rikishi.fatigue > 85 && maxSeverity > 0 && secureRandom() < 0.3) return true;
+
+  return false;
+}
+
+/**
+ * Evaluates whether an NPC should retire.
+ */
+export function evaluateRetirement(rikishi: Rikishi): boolean {
+  if (!rikishi.isNPC) return false;
+  
+  const injuries = Object.values(rikishi.injuries);
+  const maxSeverity = Math.max(0, ...injuries.map(i => i.severity));
+  
+  // High number of bashos + dropping rank + major injuries = retirement
+  if (rikishi.bashosCompleted > 30) {
+     if (maxSeverity >= 3 && secureRandom() < 0.5) return true;
+     
+     // 10 years+ and stuck in low division
+     if (rikishi.bashosCompleted > 60 && ['Makushita', 'Sandanme', 'Jonidan', 'Jonokuchi'].includes(rikishi.rank.division)) {
+        if (secureRandom() < 0.1) return true;
+     }
+
+     // Too many permanent penalties
+     const totalPermPenalties = Object.values(rikishi.permanentPenalties).reduce((a, b) => a + b, 0);
+     if (totalPermPenalties > 8 && secureRandom() < 0.2) return true;
+  }
+  return false;
+}
+
+/**
  * Securely generates a random decimal between 0 and 1 using Web Crypto API.
  */
 export function secureRandom(): number {
@@ -140,7 +186,7 @@ export function secureRandomInt(max: number): number {
  * Performs an injury roll based on current fatigue.
  * Formula: 3d54 t33 with tier-based modifiers.
  */
-export function performInjuryRoll(fatigue: number): { successes: number, results: { attr: AttributeKey | 'random', severity: number }[] } {
+export function performInjuryRoll(fatigue: number): { successes: number, results: { attr: AttributeKey | 'random', severity: number }[], rolls: number[] } {
   const rolls = Array.from({ length: 3 }, () => secureRandomInt(54));
   const threshold = 33;
   const rawSuccesses = rolls.filter(r => r >= threshold).length;
@@ -148,26 +194,30 @@ export function performInjuryRoll(fatigue: number): { successes: number, results
   let results: { attr: AttributeKey | 'random', severity: number }[] = [];
 
   if (fatigue < 40) {
-    // (3d54 t33 - 1), highest severity, same attribute
+    // 0-39%: One success ignored, highest severity only, same attribute.
     const severity = Math.max(0, rawSuccesses - 1);
-    if (severity > 0) results = [{ attr: 'random', severity }];
+    if (severity > 0) {
+      results = [{ attr: 'random', severity }];
+    }
   } else if (fatigue < 60) {
-    // (3d54 t33), highest severity, same attribute
-    if (rawSuccesses > 0) results = [{ attr: 'random', severity: rawSuccesses }];
+    // 40-59%: Highest severity only, same attribute.
+    if (rawSuccesses > 0) {
+      results = [{ attr: 'random', severity: rawSuccesses }];
+    }
   } else if (fatigue < 80) {
-    // (3d54 t33), each success applied, random attribute for each
+    // 60-79%: Each success applied, random attribute for each.
     for (let i = 0; i < rawSuccesses; i++) {
       results.push({ attr: 'random', severity: 1 });
     }
   } else {
-    // (3d54 t33 + 1), each success applied, guaranteed 1 per die, random attribute
+    // 80%+: Severity 1 guaranteed per roll, each success adds +1. Random attribute for each.
     rolls.forEach(r => {
       const severity = r >= threshold ? 2 : 1;
       results.push({ attr: 'random', severity });
     });
   }
 
-  return { successes: rawSuccesses, results };
+  return { successes: rawSuccesses, results, rolls };
 }
 
 /**
@@ -178,25 +228,31 @@ export function applyInjury(rikishi: Rikishi, severity: number, attr: AttributeK
   const newPermanent = { ...rikishi.permanentPenalties };
   const injury = { ...newInjuries[attr] };
   
-  // Each unique injury adds +1 base Fatigue
-  let baseFatigueBonus = 1;
+  const isNewInjury = injury.severity === 0;
+
+  // Each unique (new attribute) temporary injury adds +1 base Fatigue
+  let baseFatigueBonus = 0;
+  if (isNewInjury) {
+    baseFatigueBonus = 1;
+  }
   
   // Increase severity (clamped at 3)
   injury.severity = Math.min(3, injury.severity + severity);
   
-  // Track "hits" (5 hits = 1 permanent penalty)
-  injury.hits += severity;
+  // Track "hits": 5 temporary injuries (events) = 1 permanent penalty
+  // User: "every 5 temporary injuries sustained to a single attribute result in an additional permanent injury"
+  injury.hits += 1; 
+
   if (injury.hits >= 5) {
     const perms = Math.floor(injury.hits / 5);
     
     // Applying permanent penalty -1 to stat
-    // Check for stat minimum of 2
     let remainingPerms = perms;
     while (remainingPerms > 0) {
       if (rikishi.stats[attr] - newPermanent[attr] > 2) {
         newPermanent[attr] += 1;
       } else {
-        // Stat at 2, overflow adds to base fatigue
+        // Stat at 2, overflow adds to base fatigue floor
         baseFatigueBonus += 1;
       }
       remainingPerms--;
@@ -212,20 +268,59 @@ export function applyInjury(rikishi: Rikishi, severity: number, attr: AttributeK
     injuries: newInjuries,
     permanentPenalties: newPermanent,
     baseFatigue: rikishi.baseFatigue + baseFatigueBonus,
-    totalUniqueInjuries: rikishi.totalUniqueInjuries + 1
+    totalUniqueInjuries: rikishi.totalUniqueInjuries + (isNewInjury ? 1 : 0)
   };
+}
+
+/**
+ * Performs a recovery roll for a severity 2+ injury.
+ * Formula: 2d50 t33, 1 die guaranteed to recover 1 level.
+ */
+export function performRecoveryRoll(): { recoveryPoints: number, rolls: number[] } {
+  const rolls = Array.from({ length: 2 }, () => secureRandomInt(50));
+  const threshold = 33;
+  const successes = rolls.filter(r => r >= threshold).length;
+  
+  // One die guaranteed to recover a level, second success adds another.
+  // Wait, "one die guaranteed to recover a level" usually means rolls[0] is treated as success?
+  // User: "2d50, with a target value of 33, with one die guaranteed to recover a level of the injury."
+  // Example: "if both die meet target... recovered from 3 down to 1. if no dice, or only 1... recovered down to 2."
+  // This means:
+  // 1 success (or 0 successes if one is guaranteed) = 1 level recovery.
+  // 2 successes = 2 levels recovery.
+  
+  const recoveryPoints = successes === 2 ? 2 : 1;
+  
+  return { recoveryPoints, rolls };
 }
 
 /**
  * Performs a training roll: 4d40 t(X) + 3 + Bonuses
  */
-export function performTrainingRoll(bashos: number, bonus: number = 0): { successes: number, tp: number, rolls: number[] } {
+export function performTrainingRoll(bashos: number, lastBashoRecord?: CareerRecord, isKyujoEarly?: boolean): { successes: number, tp: number, rolls: number[] } {
   if (bashos >= 20) return { successes: 0, tp: 2, rolls: [] };
   
+  if (isKyujoEarly) return { successes: 0, tp: 0, rolls: [] };
+  
+  let dieBonus = 3;
+  if (lastBashoRecord) {
+    if (lastBashoRecord.rank.division === 'Makuuchi') {
+      if (lastBashoRecord.isYusho) {
+        dieBonus += 2;
+      } else if (lastBashoRecord.isJunYusho || lastBashoRecord.isSpecialPrize) {
+        dieBonus += 1;
+      }
+    } else if (['Juryo', 'Makushita', 'Sandanme', 'Jonidan', 'Jonokuchi'].includes(lastBashoRecord.rank.division)) {
+      if (lastBashoRecord.isYusho) {
+        dieBonus += 1;
+      }
+    }
+  }
+
   const threshold = getTrainingThreshold(bashos);
-  const rolls = Array.from({ length: 4 }, () => secureRandomInt(40));
+  const rolls = Array.from({ length: 4 }, () => secureRandomInt(40) + dieBonus);
   const successes = rolls.filter(r => r >= threshold).length;
-  const tp = successes + 3 + bonus;
+  const tp = successes;
   
   return { successes, tp, rolls };
 }
@@ -318,11 +413,11 @@ export function resolveTachiai(playerRoll: number, opponentRoll: number): 'matta
 /**
  * Performs Mono-ii if applicable.
  */
-export function performMonoii(): 'attacker' | 'rematch' | 'defender' {
+export function performMonoii(): { result: 'attacker' | 'rematch' | 'defender', roll: number } {
   const roll = secureRandomInt(10);
-  if (roll <= 7) return 'attacker';
-  if (roll === 8) return 'rematch';
-  return 'defender';
+  if (roll <= 7) return { result: 'attacker', roll };
+  if (roll === 8) return { result: 'rematch', roll };
+  return { result: 'defender', roll };
 }
 
 /**
@@ -380,9 +475,9 @@ export function selectNPCMove(npc: Rikishi, availableMoves: import('../types').K
   // Safe Fallback!
   if (!availableMoves || availableMoves.length === 0) {
       if (isTachiai) {
-          availableMoves = require('../constants/combat').TACHIAI_MOVES;
+          availableMoves = TACHIAI_MOVES;
       } else {
-          availableMoves = require('../constants/combat').OFFENSIVE_MOVES;
+          availableMoves = OFFENSIVE_MOVES;
       }
   }
 
@@ -456,13 +551,4 @@ export function decideNPCResources(npc: Rikishi, opponent: Rikishi): { useFocus:
   }
 
   return { useFocus, useFatigue };
-}
-
-/**
- * Performs recovery roll: 2d50 t33 + 1
- */
-export function performRecoveryRoll(): { recoveryPoints: number, rolls: number[] } {
-  const rolls = [secureRandomInt(50), secureRandomInt(50)];
-  const successes = rolls.filter(r => r >= 33).length;
-  return { recoveryPoints: successes + 1, rolls };
 }

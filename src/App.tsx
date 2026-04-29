@@ -19,11 +19,12 @@ import InjuryResolution from "./components/InjuryResolution";
 import HealthView from "./components/HealthView";
 import WorldBrowser from "./components/WorldBrowser";
 import Leaderboard from "./components/Leaderboard";
+import DevRikishiEditor from "./components/DevRikishiEditor";
 import { seedWorld } from "./lib/worldGeneration";
 import { generateBashoSchedule } from "./lib/tournamentScheduler";
 import { formatRank, abbreviateRank } from "./lib/rankLogic";
 import { BASHO_NAMES, DIVISIONS } from "./constants/world";
-import { Settings } from "lucide-react";
+import { Settings, Wrench } from "lucide-react";
 import {
   secureRandomInt,
   performInjuryRoll,
@@ -32,6 +33,8 @@ import {
 
 export default function App() {
   const [showSettings, setShowSettings] = useState(false);
+  const [isDevMode, setIsDevMode] = useState(() => localStorage.getItem('chanko_dev_mode') === 'true');
+  const [showDevEditor, setShowDevEditor] = useState(false);
   const [view, setView] = useState<GameView>(() => {
     const saved = sessionStorage.getItem("chanko_current_view");
     if (saved) {
@@ -54,6 +57,14 @@ export default function App() {
   useEffect(() => {
     sessionStorage.setItem("chanko_current_view", view);
   }, [view]);
+
+  useEffect(() => {
+    const handleDevModeChange = () => {
+      setIsDevMode(localStorage.getItem('chanko_dev_mode') === 'true');
+    };
+    window.addEventListener('chanko_dev_mode_change', handleDevModeChange);
+    return () => window.removeEventListener('chanko_dev_mode_change', handleDevModeChange);
+  }, []);
 
   useEffect(() => {
     const savedWorld = localStorage.getItem("chanko_world_state");
@@ -126,14 +137,17 @@ export default function App() {
       const schedule = generateBashoSchedule(worldState.rikishi);
       let day = 1;
 
+      // Reset boutsFoughtThisBasho for all rikishi
+      const resetRikishi = worldState.rikishi.map(r => ({ ...r, boutsFoughtThisBasho: 0 }));
+
       const updatedRikishiAfterNPCs = simulateAllBoutsForDay(
         schedule,
-        worldState.rikishi,
+        resetRikishi,
         day,
         rikishi.id,
       );
       const configuredRikishiList = updatedRikishiAfterNPCs.map((r) =>
-        r.id === rikishi.id ? rikishi : r,
+        r.id === rikishi.id ? { ...rikishi, boutsFoughtThisBasho: 0 } : r,
       );
 
       const nextWorld = {
@@ -144,6 +158,7 @@ export default function App() {
       };
 
       setWorldState(nextWorld);
+      setRikishi(prev => prev ? { ...prev, boutsFoughtThisBasho: 0 } : null);
       localStorage.setItem("chanko_world_state", JSON.stringify(nextWorld));
     }
   }, [worldState, rikishi, view]);
@@ -166,7 +181,7 @@ export default function App() {
     );
     let mockOpp =
       sameDiv.length > 0
-        ? sameDiv[secureRandomInt(sameDiv.length) - 1]
+        ? sameDiv[secureRandomInt(sameDiv.length)]
         : worldState.rikishi.filter((r) => r.isNPC)[0];
 
     if (!mockOpp) {
@@ -225,6 +240,7 @@ export default function App() {
   };
 
   const handleAction = (action: string) => {
+    console.log("handleAction fired:", action);
     if (action === "back") setView("dashboard");
     if (action === "leaderboard") setView("leaderboard");
     if (action === "end-basho") {
@@ -240,10 +256,7 @@ export default function App() {
             throw new Error("Simulation failed to produce a valid player state.");
           }
 
-          const finalPlayer = {
-            ...updatedPlayer,
-            momentum: { attribute: null, value: 1 },
-          };
+          const finalPlayer = updatedPlayer;
 
           const finalWorld = {
             ...updatedWorld,
@@ -260,6 +273,63 @@ export default function App() {
           setView("basho-summary");
         } catch (error) {
           console.error("Basho End Simulation Failed:", error);
+          setView("main-menu");
+        }
+      }
+    }
+    if (action === "kyujo") {
+      if (rikishi && worldState) {
+        try {
+          const updatedPlayer = { ...rikishi, status: 'kyujo' as const };
+          
+          const maxDays = DIVISIONS.find(d => d.name === updatedPlayer.rank.division)?.bouts || 15;
+          let currentDay = worldState.currentBashoDay || 1;
+          
+          let updatedRikishiList = worldState.rikishi.map(r => r.id === updatedPlayer.id ? updatedPlayer : r);
+          
+          // Simulate remaining days up to maxDays
+          for (let d = currentDay; d <= maxDays; d++) {
+             updatedRikishiList = simulateAllBoutsForDay(
+               worldState.bashoSchedule || [],
+               updatedRikishiList,
+               d,
+               updatedPlayer.id
+             );
+          }
+          
+          // Now fetch the updated player from the list to get applied losses
+          const finalUpdatedPlayer = updatedRikishiList.find(r => r.id === updatedPlayer.id) || updatedPlayer;
+
+          const updatedWorld = {
+            ...worldState,
+            currentBashoDay: maxDays + 1,
+            rikishi: updatedRikishiList
+          };
+          
+          setOldRank(finalUpdatedPlayer.rank);
+          const result = simulateBashoEnd(updatedWorld, finalUpdatedPlayer);
+          
+          if (!result.updatedPlayer || !result.updatedPlayer.rank) {
+            throw new Error("Simulation failed to produce a valid player state.");
+          }
+
+          const finalPlayer = result.updatedPlayer;
+
+          const finalWorld = {
+            ...result.updatedWorld,
+            rikishi: result.updatedWorld.rikishi.map(r => r.id === finalPlayer.id ? finalPlayer : r)
+          };
+
+          setRikishi(finalPlayer);
+          setWorldState(finalWorld);
+          
+          localStorage.setItem("chanko_rikishi", JSON.stringify(finalPlayer));
+          localStorage.setItem("chanko_world_state", JSON.stringify(finalWorld));
+          
+          setView("basho-summary");
+        } catch (error) {
+          console.error("Basho End Simulation Failed:", error);
+          alert("Error: " + (error as Error).message);
           setView("main-menu");
         }
       }
@@ -286,13 +356,27 @@ export default function App() {
           const opponent = currentState.rikishi.find(
             (r: any) => r.id === opponentId,
           ) || { ...rikishi, id: "mock", name: "Mockoshin", isNPC: true };
+          
           setOpponent(opponent);
           setWorldState(currentState);
           localStorage.setItem(
             "chanko_world_state",
             JSON.stringify(currentState),
           );
-          setView("basho");
+
+          if (opponent.status === 'kyujo' || opponent.status === 'retired') {
+             alert(`${opponent.name} is kyujo (withdrawn). You win by default (Fusen-sho).`);
+             handleBoutFinish({
+                playerWins: true,
+                victoryKimarite: 'Fusen-sho',
+                fatigueUsed: false,
+                focusSpent: 0,
+                finalRound: 1,
+                hasInjuryTrigger: false
+             });
+          } else {
+             setView("basho");
+          }
         } else {
           createOpponent();
           setView("basho");
@@ -337,6 +421,7 @@ export default function App() {
         ...rikishi,
         wins: rikishi.wins + (result.playerWins ? 1 : 0),
         losses: rikishi.losses + (result.playerWins ? 0 : 1),
+        boutsFoughtThisBasho: (rikishi.boutsFoughtThisBasho || 0) + 1,
         // Correctly deduct focus points
         focusPoints: Math.max(
           0,
@@ -361,9 +446,24 @@ export default function App() {
       );
       const maxDays = divisionInfo ? divisionInfo.bouts : 15;
 
-      let updatedRikishiList = currentState.rikishi.map((r: any) =>
-        r.id === updatedPlayer.id ? updatedPlayer : r,
+      const currentBout = currentState.bashoSchedule?.find(
+        (p: any) => p.day === day && (p.rikishiId1 === updatedPlayer.id || p.rikishiId2 === updatedPlayer.id)
       );
+      const actualOpponentId = currentBout 
+        ? (currentBout.rikishiId1 === updatedPlayer.id ? currentBout.rikishiId2 : currentBout.rikishiId1)
+        : null;
+
+      let updatedRikishiList = currentState.rikishi.map((r: any) => {
+        if (r.id === updatedPlayer.id) return updatedPlayer;
+        if (actualOpponentId && r.id === actualOpponentId) {
+           return {
+             ...r,
+             wins: r.wins + (result.playerWins ? 0 : 1),
+             losses: r.losses + (result.playerWins ? 1 : 0),
+           };
+        }
+        return r;
+      });
 
       if (schedule && nextDay <= maxDays) {
         updatedRikishiList = simulateAllBoutsForDay(
@@ -424,6 +524,26 @@ export default function App() {
   return (
     <div className="flex justify-center h-[100dvh] bg-sumo-outer overflow-hidden select-none">
       <div className="relative w-full max-w-md h-full bg-sumo-paper shadow-2xl overflow-hidden flex flex-col border-x border-sumo-earth/20">
+        
+        {/* Dev Tools Render */}
+        {isDevMode && rikishi && (
+          <button 
+            onClick={() => setShowDevEditor(true)}
+            className="absolute bottom-24 left-4 z-50 p-3 bg-yellow-500 hover:bg-yellow-400 text-yellow-950 rounded-full shadow-lg transition shadow-yellow-500/20"
+          >
+            <Wrench size={24} />
+          </button>
+        )}
+        <AnimatePresence>
+          {showDevEditor && rikishi && (
+            <DevRikishiEditor 
+              rikishi={rikishi} 
+              onSave={saveRikishi} 
+              onClose={() => setShowDevEditor(false)} 
+            />
+          )}
+        </AnimatePresence>
+
         <AnimatePresence>
           {showSettings && (
             <SettingsModal
@@ -471,7 +591,7 @@ export default function App() {
                     exit={{ opacity: 0 }}
                     className="w-full h-full"
                   >
-                    <Dashboard rikishi={rikishi} onAction={handleAction} />
+                    <Dashboard rikishi={rikishi} worldState={worldState} onAction={handleAction} />
                   </motion.div>
                 )}
                 {view === "basho-summary" && rikishi && (

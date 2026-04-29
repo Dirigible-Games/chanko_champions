@@ -1,6 +1,6 @@
 import { motion } from 'motion/react';
 import { Rikishi, WorldState, RankInfo } from '../types';
-import { Trophy, ChevronRight, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react';
+import { Trophy, ChevronRight, ArrowUpRight, ArrowDownRight, Minus, Award, Star } from 'lucide-react';
 import { calculateRankChange, formatRank, abbreviateRank } from '../lib/rankLogic';
 import { simulateBashoEnd } from '../lib/bashoSimulation';
 import { DIVISIONS } from '../constants/world';
@@ -22,6 +22,9 @@ export default function BashoSummary({ rikishi, oldRank, worldState, onContinue 
     : null;
   const wins = lastHistory ? lastHistory.wins : (rikishi?.wins || 0);
   const losses = lastHistory ? lastHistory.losses : (rikishi?.losses || 0);
+  const isYusho = lastHistory?.isYusho;
+  const isJunYusho = lastHistory?.isJunYusho;
+  const isSpecialPrize = lastHistory?.isSpecialPrize;
   
   const totalBouts = divisionInfo ? divisionInfo.bouts : 15;
   const isKachiKoshi = wins > totalBouts / 2;
@@ -73,6 +76,43 @@ export default function BashoSummary({ rikishi, oldRank, worldState, onContinue 
 
       <div className="flex-1 px-6 py-8 overflow-y-auto w-full bg-sumo-paper japanese-pattern-bg">
         <div className="max-w-sm mx-auto space-y-6">
+          {(isYusho || isJunYusho || isSpecialPrize) && (
+            <motion.section 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: "spring", bounce: 0.5, delay: 0.2 }}
+              className="bg-amber-100 border-2 border-amber-300 rounded-3xl p-6 shadow-sm flex flex-col items-center text-center relative overflow-hidden"
+            >
+              <div className="absolute top-0 left-0 w-full h-1 bg-amber-400" />
+              <Award className="text-amber-500 mb-2" size={40} />
+              <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-900/60 mb-2">Honors</h3>
+              
+              <div className="space-y-2 w-full">
+                {isYusho && (
+                  <div className="flex items-center justify-center gap-2 text-2xl font-serif font-black italic text-amber-600 leading-tight">
+                    <Trophy size={24} className="text-amber-500" />
+                    <span>Tournament Yusho</span>
+                    <Trophy size={24} className="text-amber-500" />
+                  </div>
+                )}
+                {isJunYusho && !isYusho && (
+                  <div className="flex items-center justify-center gap-2 text-xl font-serif font-black italic text-amber-700 leading-tight">
+                    <Award size={20} className="text-amber-600" />
+                    <span>Jun-Yusho</span>
+                    <Award size={20} className="text-amber-600" />
+                  </div>
+                )}
+                {isSpecialPrize && (
+                  <div className="flex items-center justify-center gap-2 text-lg font-serif font-black italic text-amber-800 leading-tight">
+                    <Star size={18} className="text-amber-600" />
+                    <span>Special Prize</span>
+                    <Star size={18} className="text-amber-600" />
+                  </div>
+                )}
+              </div>
+            </motion.section>
+          )}
+
           <section>
             <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-sumo-ink/40 mb-4 text-center">Banzuke Performance</h3>
             

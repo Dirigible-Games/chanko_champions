@@ -32,17 +32,29 @@ export default function InjuryResolution({ rikishi, onComplete }: InjuryResoluti
     
     // Simulate dice roll delay
     setTimeout(() => {
-      const { successes: sCount, results: rawResults } = performInjuryRoll(rikishi.fatigue);
-      const tempDice = Array.from({ length: 3 }, () => secureRandomInt(54)); // For visual display mostly, matched to logic
+      const { successes: sCount, results: rawResults, rolls } = performInjuryRoll(rikishi.fatigue);
       
-      setDice(tempDice);
+      setDice(rolls);
       setSuccesses(sCount);
       
       const attrs: AttributeKey[] = ['power', 'balance', 'footwork', 'technique', 'spirit'];
-      const finalizedResults = rawResults.map(res => ({
-        attr: res.attr === 'random' ? attrs[secureRandomInt(attrs.length) - 1] : res.attr as AttributeKey,
-        severity: res.severity
-      }));
+      
+      let finalizedResults: { attr: AttributeKey, severity: number }[] = [];
+
+      if (rikishi.fatigue < 60) {
+        // Tiers 1 and 2: Single attribute for all attempts
+        const selectedAttr = attrs[secureRandomInt(attrs.length)];
+        finalizedResults = rawResults.map(res => ({
+          attr: selectedAttr,
+          severity: res.severity
+        }));
+      } else {
+        // Tiers 3 and 4: Random attribute for each attempt
+        finalizedResults = rawResults.map(res => ({
+          attr: attrs[secureRandomInt(attrs.length)],
+          severity: res.severity
+        }));
+      }
 
       setInjuryResults(finalizedResults);
       setStep('results');

@@ -16,6 +16,7 @@ export interface CareerRecord {
   losses: number;
   isYusho: boolean;
   isJunYusho: boolean;
+  isSpecialPrize?: boolean;
 }
 
 export type RikishiArchetype = 'Yotsu' | 'Nagete' | 'Kakete' | 'Tokushuwaza' | 'Oshi' | 'Custom';
@@ -104,6 +105,9 @@ export interface Rikishi {
   hasRenamedAtCurrentRank: boolean;
   careerHistory: CareerRecord[];
   isNPC: boolean;
+  status?: 'active' | 'kyujo' | 'retired';
+  kyujoDays?: number;
+  boutsFoughtThisBasho?: number;
 }
 
 export interface NewsItem {

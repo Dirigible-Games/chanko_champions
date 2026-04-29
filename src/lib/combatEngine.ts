@@ -135,7 +135,7 @@ export function simulateFullBout(
         } else {
           nextStances = ["Neutral"];
         }
-        const nextStance = nextStances[secureRandomInt(nextStances.length) - 1];
+        const nextStance = nextStances[secureRandomInt(nextStances.length)];
         if (r1Won) {
           r1Stance = nextStance;
           r2Stance = "Neutral";
@@ -218,8 +218,8 @@ export function simulateFullBout(
       const attackerRoll = r1Attacking ? r1Roll : r2Roll;
       const defenderRoll = r1Attacking ? r2Roll : r1Roll;
 
-      if (attackerRoll.total === defenderRoll.total) {
-        const monoii = performMonoii();
+      if (attackerRoll.total <= defenderRoll.total + 3) {
+        const monoii = performMonoii().result;
         if (monoii === "rematch") {
           round++;
           continue;
@@ -234,7 +234,7 @@ export function simulateFullBout(
                 ? rikishi2.id
                 : rikishi1.id;
         }
-      } else if (attackerRoll.total > defenderRoll.total) {
+      } else if (attackerRoll.total > defenderRoll.total + 3) {
         // Attacker Wins
         isFinished = true;
         winnerId = r1Attacking ? rikishi1.id : rikishi2.id;
@@ -263,7 +263,7 @@ export function simulateFullBout(
             nextStances = ["Neutral"];
           }
           const nextStance =
-            nextStances[secureRandomInt(nextStances.length) - 1];
+            nextStances[secureRandomInt(nextStances.length)];
           if (r1Attacking) {
             r2Stance = nextStance;
             r1Stance = "Neutral";

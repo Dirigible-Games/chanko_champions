@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Rikishi, AttributeKey, RikishiStats } from '../types';
-import { performTrainingRoll, getTrainingThreshold, getStatUpgradeCost, isStatLineLegal, performRecoveryRoll, getSpecializationSlots } from '../lib/gameLogic';
+import { performTrainingRoll, getTrainingThreshold, getStatUpgradeCost, isStatLineLegal, getSpecializationSlots } from '../lib/gameLogic';
+import { DIVISIONS } from '../constants/world';
 import { Zap, Heart, Trophy, ChevronRight, Check, Dice5, Coffee, Activity, Award, Edit3 } from 'lucide-react';
+import RecoveryResolution from './RecoveryResolution';
 
 interface InterBashoProps {
   rikishi: Rikishi;
@@ -27,7 +29,7 @@ const MOCK_KIMARITE = [
 ];
 
 export default function InterBasho({ rikishi, updateRikishi, onFinish }: InterBashoProps) {
-  const [phase, setPhase] = useState<'recovery' | 'roll' | 'roll_result' | 'spend' | 'momentum' | 'specialization' | 'rename'>('recovery');
+  const [phase, setPhase] = useState<'recovery' | 'recovery_resolution' | 'roll' | 'roll_result' | 'spend' | 'momentum' | 'specialization' | 'rename'>('recovery');
   const [localRikishi, setLocalRikishi] = useState<Rikishi>({ ...rikishi });
   const [spendSnapshot, setSpendSnapshot] = useState<Rikishi | null>(null);
   const [newName, setNewName] = useState(rikishi.name);
@@ -48,7 +50,12 @@ export default function InterBasho({ rikishi, updateRikishi, onFinish }: InterBa
   // Auto-roll if it's the 20th+ basho or if we want to skip the animation for high levels
   useEffect(() => {
     if (rikishi.bashosCompleted >= 20 && phase === 'roll') {
-      const result = performTrainingRoll(rikishi.bashosCompleted);
+      const lastRecord = rikishi.careerHistory?.[rikishi.careerHistory.length - 1];
+      const divInfo = DIVISIONS.find(d => d.name === rikishi.rank.division);
+      const boutsScheduled = divInfo ? divInfo.bouts : 15;
+      const isKyujoEarly = (rikishi.boutsFoughtThisBasho !== undefined) && (rikishi.boutsFoughtThisBasho < boutsScheduled / 2);
+      
+      const result = performTrainingRoll(rikishi.bashosCompleted, lastRecord, isKyujoEarly);
       setRollResult(result);
       setLocalRikishi(prev => ({ ...prev, tpAvailable: prev.tpAvailable + result.tp }));
       setPhase('roll_result');
@@ -56,47 +63,25 @@ export default function InterBasho({ rikishi, updateRikishi, onFinish }: InterBa
   }, [rikishi.bashosCompleted, phase]);
 
   const handleStartRecovery = () => {
-    const logs: string[] = [];
-    const newInjuries = { ...localRikishi.injuries };
-    
-    // Check if rank changed (promo/demo) to reset renaming flag
-    // (A simple heuristic for rank change, more robust to compare full object if possible)
-    const hasRankChanged = localRikishi.rank.division !== rikishi.rank.division 
-                        || localRikishi.rank.title !== rikishi.rank.title 
-                        || localRikishi.rank.side !== rikishi.rank.side;
-    const finalHasRenamed = hasRankChanged ? false : localRikishi.hasRenamedAtCurrentRank;
+    setPhase('recovery_resolution');
+  };
 
-    // Recovery Phase
-    (Object.keys(newInjuries) as AttributeKey[]).map(attr => {
-      if (newInjuries[attr].severity === 1) {
-        newInjuries[attr].severity = 0;
-        logs.push(`${STAT_LABELS[attr]} Injury recovered automatically.`);
-      } else if (newInjuries[attr].severity > 1) {
-        const { recoveryPoints } = performRecoveryRoll();
-        newInjuries[attr].severity = Math.max(0, newInjuries[attr].severity - recoveryPoints);
-        if (newInjuries[attr].severity === 0) {
-          logs.push(`${STAT_LABELS[attr]} Injury fully recovered.`);
-        } else {
-          logs.push(`${STAT_LABELS[attr]} Injury partially healed.`);
-        }
-      }
-    });
-
-    if (logs.length === 0) logs.push("No injuries requiring recovery.");
-    
+  const handleRecoveryComplete = (updated: Rikishi, logs: string[]) => {
     setRecoveryLog(logs);
     setLocalRikishi(prev => ({
-      ...prev,
-      injuries: newInjuries,
-      fatigue: prev.fatigue + 5,
-      hasRenamedAtCurrentRank: finalHasRenamed
+      ...updated,
+      bashosCompleted: prev.bashosCompleted // Ensure we keep original bashos completed until roll
     }));
-    
-    setTimeout(() => setPhase('roll'), 3000);
+    setPhase('roll');
   };
 
   const handleRoll = () => {
-    const result = performTrainingRoll(rikishi.bashosCompleted);
+    const lastRecord = rikishi.careerHistory?.[rikishi.careerHistory.length - 1];
+    const divInfo = DIVISIONS.find(d => d.name === rikishi.rank.division);
+    const boutsScheduled = divInfo ? divInfo.bouts : 15;
+    const isKyujoEarly = (rikishi.boutsFoughtThisBasho !== undefined) && (rikishi.boutsFoughtThisBasho < boutsScheduled / 2);
+    
+    const result = performTrainingRoll(rikishi.bashosCompleted, lastRecord, isKyujoEarly);
     setRollResult(result);
     setLocalRikishi(prev => ({ 
       ...prev, 
@@ -267,6 +252,13 @@ export default function InterBasho({ rikishi, updateRikishi, onFinish }: InterBa
                 </button>
               )}
             </motion.div>
+          )}
+
+          {phase === 'recovery_resolution' && (
+            <RecoveryResolution 
+               rikishi={localRikishi} 
+               onComplete={handleRecoveryComplete} 
+            />
           )}
 
           {phase === 'roll' && (

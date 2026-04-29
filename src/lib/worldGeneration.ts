@@ -60,7 +60,7 @@ export function seedWorld(): Rikishi[] {
   return world;
 }
 
-function generateNPCRikishi(rank: RankInfo, existingNames: Set<string>): Rikishi {
+export function generateNPCRikishi(rank: RankInfo, existingNames: Set<string>): Rikishi {
   const stats: RikishiStats = {
     power: 3 + secureRandomInt(8) - 1,
     balance: 3 + secureRandomInt(8) - 1,
@@ -87,7 +87,7 @@ function generateNPCRikishi(rank: RankInfo, existingNames: Set<string>): Rikishi
     }
   });
 
-  const beya = BEYAS[secureRandomInt(BEYAS.length) - 1];
+  const beya = BEYAS[secureRandomInt(BEYAS.length)];
   const bashosCompleted = 5 + secureRandomInt(80) - 1; // 5 to 84 bashos
   
   // Calculate Base Stats for legacy
@@ -112,7 +112,7 @@ function generateNPCRikishi(rank: RankInfo, existingNames: Set<string>): Rikishi
     const rolls = Math.floor(bashosCompleted / 10); // One per ~year
     for (let i = 0; i < rolls; i++) {
       if (secureRandom() < 0.2) { // 20% chance of a historical permanent injury per roll
-        const attr = attrs[secureRandomInt(attrs.length) - 1];
+        const attr = attrs[secureRandomInt(attrs.length)];
         permanentPenalties[attr] += 1;
         totalUniqueInjuries += 1;
       }
@@ -147,6 +147,7 @@ function generateNPCRikishi(rank: RankInfo, existingNames: Set<string>): Rikishi
     specializations: [],
     hasRenamedAtCurrentRank: false,
     careerHistory: [],
-    isNPC: true
+    isNPC: true,
+    status: 'active'
   };
 }
