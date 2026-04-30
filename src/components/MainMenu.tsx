@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Trophy, Github, FileBox, AlertTriangle } from 'lucide-react';
+import { Trophy, Github, FileBox, AlertTriangle, Settings } from 'lucide-react';
 
 interface MainMenuProps {
   hasSave: boolean;
   onNewGame: () => void;
   onContinue: () => void;
+  onSettings: () => void;
 }
 
-export default function MainMenu({ hasSave, onNewGame, onContinue }: MainMenuProps) {
+export default function MainMenu({ hasSave, onNewGame, onContinue, onSettings }: MainMenuProps) {
   const [showConfirm, setShowConfirm] = useState(false);
 
   const handleNewGameClick = () => {
@@ -75,6 +76,13 @@ export default function MainMenu({ hasSave, onNewGame, onContinue }: MainMenuPro
                   }`}
                 >
                   CONTINUE
+                </button>
+
+                <button 
+                  onClick={onSettings}
+                  className="w-full py-4 rounded-xl font-bold uppercase tracking-[0.2em] text-xs transition-all text-center flex justify-center items-center gap-2 border-2 border-sumo-earth/20 text-sumo-ink/60 hover:bg-sumo-earth/10 active:scale-95"
+                >
+                  <Settings size={14} /> SETTINGS
                 </button>
               </motion.div>
             ) : (

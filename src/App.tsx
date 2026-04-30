@@ -31,14 +31,28 @@ import {
   applyInjury,
 } from "./lib/gameLogic";
 
-import React from 'react';
+import React, { Component, ReactNode } from 'react';
 
-class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error: Error | null}> {
-  constructor(props: {children: React.ReactNode}) {
+interface ErrorBoundaryProps {
+  children: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  public state: ErrorBoundaryState = { hasError: false, error: null };
+  public props: ErrorBoundaryProps;
+
+  constructor(props: ErrorBoundaryProps) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.props = props;
   }
-  static getDerivedStateFromError(error: Error) { return { hasError: true, error }; }
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState { 
+    return { hasError: true, error }; 
+  }
   render() {
     if (this.state.hasError) {
       return (
@@ -601,6 +615,7 @@ function AppContent() {
             hasSave={!!worldState && !!rikishi}
             onNewGame={handleNewGame}
             onContinue={() => setView("dashboard")}
+            onSettings={() => setShowSettings(true)}
           />
         ) : rikishi ? (
           <>

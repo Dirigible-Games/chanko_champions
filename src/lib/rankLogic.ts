@@ -54,7 +54,10 @@ function getExpectedScore(rikishi: Rikishi, isYushoThisBasho: boolean): number {
          }
       }
 
-      if (isMakeKoshi && lastWasMakeKoshi) return 4; // Demoted to Sekiwake
+      if (isMakeKoshi && lastWasMakeKoshi) {
+         // Reverting to strict Sekiwake demotion as per standard sumo rules
+         return 4; 
+      }
       return currentScore; // Stays Ozeki
    }
 
