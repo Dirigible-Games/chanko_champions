@@ -19,9 +19,10 @@ import InjuryResolution from "./components/InjuryResolution";
 import HealthView from "./components/HealthView";
 import WorldBrowser from "./components/WorldBrowser";
 import Leaderboard from "./components/Leaderboard";
+import BashoResults from "./components/BashoResults";
 import DevRikishiEditor from "./components/DevRikishiEditor";
 import { seedWorld } from "./lib/worldGeneration";
-import { generateBashoSchedule } from "./lib/tournamentScheduler";
+import { generateBashoScheduleForDay } from "./lib/tournamentScheduler";
 import { formatRank, abbreviateRank } from "./lib/rankLogic";
 import { BASHO_NAMES, DIVISIONS } from "./constants/world";
 import { Settings, Wrench } from "lucide-react";
@@ -177,7 +178,7 @@ function AppContent() {
       view === "dashboard" &&
       (!worldState.bashoSchedule || worldState.currentBashoDay === undefined)
     ) {
-      const schedule = generateBashoSchedule(worldState.rikishi);
+      const schedule = generateBashoScheduleForDay(worldState.rikishi, [], 1);
       let day = 1;
 
       // Reset boutsFoughtThisBasho for all rikishi
@@ -286,6 +287,7 @@ function AppContent() {
     console.log("handleAction fired:", action);
     if (action === "back") setView("dashboard");
     if (action === "leaderboard") setView("leaderboard");
+    if (action === "torikumi") setView("torikumi");
     if (action === "end-basho") {
       if (rikishi && worldState) {
         try {
@@ -330,10 +332,15 @@ function AppContent() {
           
           let updatedRikishiList = worldState.rikishi.map(r => r.id === updatedPlayer.id ? updatedPlayer : r);
           
+          let currentSchedule = worldState.bashoSchedule || [];
+
           // Simulate remaining days up to maxDays
           for (let d = currentDay; d <= maxDays; d++) {
+             const nextDaySchedule = generateBashoScheduleForDay(updatedRikishiList, currentSchedule, d);
+             currentSchedule = [...currentSchedule, ...nextDaySchedule];
+
              updatedRikishiList = simulateAllBoutsForDay(
-               worldState.bashoSchedule || [],
+               currentSchedule,
                updatedRikishiList,
                d,
                updatedPlayer.id
@@ -345,6 +352,7 @@ function AppContent() {
 
           const updatedWorld = {
             ...worldState,
+            bashoSchedule: currentSchedule,
             currentBashoDay: maxDays + 1,
             rikishi: updatedRikishiList
           };
@@ -508,9 +516,13 @@ function AppContent() {
         return r;
       });
 
-      if (schedule && nextDay <= maxDays) {
+      let newSchedule = schedule || [];
+      if (nextDay <= maxDays) {
+        const nextDaySchedule = generateBashoScheduleForDay(updatedRikishiList, newSchedule, nextDay);
+        newSchedule = [...newSchedule, ...nextDaySchedule];
+
         updatedRikishiList = simulateAllBoutsForDay(
-          schedule,
+          newSchedule,
           updatedRikishiList,
           nextDay,
           updatedPlayer.id,
@@ -519,6 +531,7 @@ function AppContent() {
 
       const updatedWorld = {
         ...currentState,
+        bashoSchedule: newSchedule,
         currentBashoDay: nextDay,
         rikishi: updatedRikishiList,
       };
@@ -745,6 +758,21 @@ function AppContent() {
                     <Leaderboard
                       rikishi={rikishi}
                       allRikishi={worldState.rikishi}
+                      onAction={handleAction}
+                    />
+                  </motion.div>
+                )}
+                {view === "torikumi" && worldState && (
+                  <motion.div
+                    key="torikumi"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="w-full h-full"
+                  >
+                    <BashoResults
+                      worldState={worldState}
+                      rikishi={rikishi}
                       onAction={handleAction}
                     />
                   </motion.div>

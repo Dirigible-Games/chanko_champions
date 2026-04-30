@@ -138,7 +138,7 @@ export interface WorldState {
   currentBashoDay?: number;
 }
 
-export type GameView = 'main-menu' | 'creation' | 'dashboard' | 'news' | 'basho' | 'profile' | 'basho-summary' | 'inter-basho' | 'world' | 'leaderboard' | 'injury-resolution' | 'health';
+export type GameView = 'main-menu' | 'creation' | 'dashboard' | 'news' | 'basho' | 'profile' | 'basho-summary' | 'inter-basho' | 'world' | 'leaderboard' | 'torikumi' | 'injury-resolution' | 'health';
 
 export const BEYAS = [
   "Ajigawa", "Arashio", "Asahiyama", "Asakayama", "Dewanoumi",

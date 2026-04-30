@@ -114,6 +114,12 @@ export default function Dashboard({ rikishi, onAction }: DashboardProps) {
         <div className="mt-auto space-y-2">
           <div className="flex gap-2">
             <button 
+              onClick={() => onAction?.('torikumi')}
+              className="flex-1 bg-sumo-earth/10 text-sumo-ink p-2 rounded-xl font-bold uppercase tracking-widest text-[10px] active:scale-95 transition-all text-center"
+            >
+              Torikumi
+            </button>
+            <button 
               onClick={() => onAction?.('leaderboard')}
               className="flex-1 bg-sumo-earth/10 text-sumo-ink p-2 rounded-xl font-bold uppercase tracking-widest text-[10px] active:scale-95 transition-all text-center"
             >
@@ -122,7 +128,7 @@ export default function Dashboard({ rikishi, onAction }: DashboardProps) {
             {!isBashoComplete && (
               <button 
                 onClick={() => setShowWithdrawConfirm(true)}
-                className="flex-1 bg-sumo-accent/10 text-sumo-accent p-2 rounded-xl font-bold uppercase tracking-widest text-[10px] active:scale-95 transition-all text-center"
+                className="flex-1 bg-sumo-accent/10 text-sumo-accent p-2 rounded-xl font-bold uppercase tracking-widest text-[10px] active:scale-95 transition-all text-center border border-sumo-accent/20"
               >
                 Withdraw
               </button>
