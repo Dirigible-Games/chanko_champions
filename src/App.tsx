@@ -497,12 +497,22 @@ function AppContent() {
       );
       const maxDays = divisionInfo ? divisionInfo.bouts : 15;
 
-      const currentBout = currentState.bashoSchedule?.find(
+      let newSchedule = schedule ? schedule.map(b => ({ ...b })) : [];
+      const currentBout = newSchedule.find(
         (p: any) => p.day === day && (p.rikishiId1 === updatedPlayer.id || p.rikishiId2 === updatedPlayer.id)
       );
+      
       const actualOpponentId = currentBout 
         ? (currentBout.rikishiId1 === updatedPlayer.id ? currentBout.rikishiId2 : currentBout.rikishiId1)
         : null;
+
+      if (currentBout) {
+        if (result.playerWins) {
+          currentBout.result = currentBout.rikishiId1 === updatedPlayer.id ? 'rikishiId1' : 'rikishiId2';
+        } else {
+          currentBout.result = currentBout.rikishiId1 === updatedPlayer.id ? 'rikishiId2' : 'rikishiId1';
+        }
+      }
 
       let updatedRikishiList = currentState.rikishi.map((r: any) => {
         if (r.id === updatedPlayer.id) return updatedPlayer;
@@ -516,7 +526,6 @@ function AppContent() {
         return r;
       });
 
-      let newSchedule = schedule || [];
       if (nextDay <= maxDays) {
         const nextDaySchedule = generateBashoScheduleForDay(updatedRikishiList, newSchedule, nextDay);
         newSchedule = [...newSchedule, ...nextDaySchedule];
