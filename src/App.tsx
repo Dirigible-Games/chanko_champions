@@ -96,6 +96,7 @@ function AppContent() {
   const [oldRank, setOldRank] = useState<RankInfo | null>(null);
   const [pendingInjuryRikishi, setPendingInjuryRikishi] =
     useState<Rikishi | null>(null);
+  const [pendingInjuryHits, setPendingInjuryHits] = useState<number>(0);
 
   // Sync view state to session storage to persist across iframe reloads
   useEffect(() => {
@@ -423,7 +424,7 @@ function AppContent() {
                 fatigueUsed: false,
                 focusSpent: 0,
                 finalRound: 1,
-                hasInjuryTrigger: false
+                injuryHits: 0
              });
           } else {
              setView("basho");
@@ -456,7 +457,7 @@ function AppContent() {
     fatigueUsed: boolean;
     focusSpent: number;
     finalRound: number;
-    hasInjuryTrigger: boolean;
+    injuryHits: number;
   }) => {
     if (rikishi && worldState) {
       const savedState = localStorage.getItem("chanko_world_state");
@@ -548,8 +549,9 @@ function AppContent() {
       setWorldState(updatedWorld);
       localStorage.setItem("chanko_world_state", JSON.stringify(updatedWorld));
 
-      if (result.hasInjuryTrigger) {
+      if (result.injuryHits > 0) {
         setPendingInjuryRikishi(updatedPlayer);
+        setPendingInjuryHits(result.injuryHits);
         setView("injury-resolution");
       } else {
         setRikishi(updatedPlayer);
@@ -738,6 +740,7 @@ function AppContent() {
                   >
                     <InjuryResolution
                       rikishi={pendingInjuryRikishi}
+                      hits={pendingInjuryHits}
                       onComplete={handleInjuryResolutionComplete}
                     />
                   </motion.div>

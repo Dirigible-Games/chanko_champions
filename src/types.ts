@@ -19,7 +19,7 @@ export interface CareerRecord {
   isSpecialPrize?: boolean;
 }
 
-export type RikishiArchetype = 'Yotsu' | 'Nagete' | 'Kakete' | 'Tokushuwaza' | 'Oshi' | 'Custom';
+export type RikishiArchetype = 'Yotsu' | 'Nagewaza' | 'Ashiwaza' | 'Kawari' | 'Oshi' | 'Custom';
 
 export interface RikishiStats {
   power: number;
@@ -44,7 +44,7 @@ export interface Specialization {
   secondaryAttr: AttributeKey;
 }
 
-export type Stance = 'Neutral' | 'Yotsu' | 'Nagete' | 'Kakete' | 'Tokushuwaza' | 'Oshi';
+export type Stance = 'Neutral' | 'Yotsu' | 'Nagewaza' | 'Ashiwaza' | 'Kawari' | 'Oshi';
 
 export interface Kimarite {
   id: string;
@@ -70,7 +70,7 @@ export interface BoutState {
   victoryKimarite: string | null;
   isMonoii: boolean;
   fatigueDieUsed: boolean;
-  hasInjuryTrigger: boolean;
+  injuryHits: number;
 }
 
 export interface Rikishi {

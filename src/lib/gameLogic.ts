@@ -197,38 +197,61 @@ export function secureRandomInt(max: number): number {
  * Performs an injury roll based on current fatigue.
  * Formula: 3d54 t33 with tier-based modifiers.
  */
-export function performInjuryRoll(fatigue: number): { successes: number, results: { attr: AttributeKey | 'random', severity: number }[], rolls: number[] } {
-  const rolls = Array.from({ length: 3 }, () => secureRandomInt(54));
-  const threshold = 33;
-  const rawSuccesses = rolls.filter(r => r >= threshold).length;
-  
-  let results: { attr: AttributeKey | 'random', severity: number }[] = [];
+export interface InjuryEvent {
+  rolls: number[];
+  baseSuccesses: number;
+  finalSuccesses: number;
+  severity: number;
+}
 
-  if (fatigue < 40) {
-    // 0-39%: One success ignored, highest severity only, same attribute.
-    const severity = Math.max(0, rawSuccesses - 1);
-    if (severity > 0) {
-      results = [{ attr: 'random', severity }];
+export function performInjuryRoll(fatigue: number, hits: number): { 
+  events: InjuryEvent[], 
+  results: { attr: AttributeKey, severity: number }[] 
+} {
+  const events: InjuryEvent[] = [];
+  const threshold = 33;
+
+  for (let i = 0; i < hits; i++) {
+    const rolls = Array.from({ length: 3 }, () => secureRandomInt(54));
+    const baseSuccesses = rolls.filter(r => r >= threshold).length;
+    let finalSuccesses = baseSuccesses;
+
+    if (fatigue < 40) {
+      finalSuccesses = Math.max(0, baseSuccesses - 1);
+    } else if (fatigue >= 80) {
+      // One die is automatically counted as a success (add +1)
+      finalSuccesses = Math.min(3, baseSuccesses + 1);
+    } else {
+      finalSuccesses = baseSuccesses;
     }
-  } else if (fatigue < 60) {
-    // 40-59%: Highest severity only, same attribute.
-    if (rawSuccesses > 0) {
-      results = [{ attr: 'random', severity: rawSuccesses }];
-    }
-  } else if (fatigue < 80) {
-    // 60-79%: Each success applied, random attribute for each.
-    for (let i = 0; i < rawSuccesses; i++) {
-      results.push({ attr: 'random', severity: 1 });
-    }
-  } else {
-    // 80%+: Severity 1 guaranteed per roll, each success adds +1. Random attribute for each.
-    rolls.forEach(r => {
-      const severity = r >= threshold ? 2 : 1;
-      results.push({ attr: 'random', severity });
+    
+    events.push({
+      rolls,
+      baseSuccesses,
+      finalSuccesses,
+      severity: finalSuccesses
     });
   }
 
-  return { successes: rawSuccesses, results, rolls };
+  let results: { attr: AttributeKey, severity: number }[] = [];
+  const attrs: AttributeKey[] = ['power', 'balance', 'footwork', 'technique', 'spirit'];
+
+  if (fatigue < 60) {
+    const maxSeverity = Math.max(...events.map(e => e.severity), 0);
+    if (maxSeverity > 0) {
+      const selectedAttr = attrs[secureRandomInt(attrs.length) - 1];
+      results.push({ attr: selectedAttr, severity: maxSeverity });
+    }
+  } else {
+    events.forEach(e => {
+      if (e.severity > 0) {
+        const selectedAttr = attrs[secureRandomInt(attrs.length) - 1];
+        results.push({ attr: selectedAttr, severity: e.severity });
+      }
+    });
+  }
+
+  return { events, results };
 }
 
 /**
@@ -416,8 +439,8 @@ export function performCombatRoll(baseDie: number, bonuses: number = 0, ir: numb
  */
 export function resolveTachiai(playerRoll: number, opponentRoll: number): 'matta' | 'player_critical' | 'opponent_critical' | 'player_win' | 'opponent_win' {
   if (Math.abs(playerRoll - opponentRoll) <= 2) return 'matta';
-  if (playerRoll >= opponentRoll + 50) return 'player_critical';
-  if (opponentRoll >= playerRoll + 50) return 'opponent_critical';
+  if (playerRoll >= opponentRoll + 38) return 'player_critical';
+  if (opponentRoll >= playerRoll + 38) return 'opponent_critical';
   return playerRoll > opponentRoll ? 'player_win' : 'opponent_win';
 }
 

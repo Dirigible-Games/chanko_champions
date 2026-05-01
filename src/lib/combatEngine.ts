@@ -26,8 +26,8 @@ export function simulateFullBout(
   winnerId: string;
   updatedR1: Rikishi;
   updatedR2: Rikishi;
-  hasInjury1: boolean;
-  hasInjury2: boolean;
+  injuryHits1: number;
+  injuryHits2: number;
 } {
   let isFinished = false;
   let winnerId = "";
@@ -41,8 +41,8 @@ export function simulateFullBout(
   let r1FatigueUsed = false;
   let r2FatigueUsed = false;
 
-  let hasInjury1 = false;
-  let hasInjury2 = false;
+  let injuryHits1 = 0;
+  let injuryHits2 = 0;
 
   const r1Stats = getEffectiveStats(rikishi1);
   const r2Stats = getEffectiveStats(rikishi2);
@@ -99,8 +99,8 @@ export function simulateFullBout(
         r1Stats[r2Move.primaryAttr] + r1Stats[r2Move.secondaryAttr];
       const r2StatBonus = calculateStatBonus(r2SumR2, r2SumR1, r2Elite);
 
-      if (r1Move.counters?.includes(r2Move.id)) r1Ir = Math.max(r1Ir, 3);
-      if (r2Move.counters?.includes(r1Move.id)) r2Ir = Math.max(r2Ir, 3);
+      if (r1Move.counters?.includes(r2Move.id)) r1Ir = Math.max(r1Ir, r1Elite ? 9 : 7);
+      if (r2Move.counters?.includes(r1Move.id)) r2Ir = Math.max(r2Ir, r2Elite ? 9 : 7);
 
       const r1Roll = performCombatRoll(r1BaseDie, r1StatBonus, r1Ir);
       const r2Roll = performCombatRoll(r2BaseDie, r2StatBonus, r2Ir);
@@ -109,11 +109,11 @@ export function simulateFullBout(
       const thresh1 =
         getBaseInjuryThreshold(rikishi1.bashosCompleted) -
         getFatigueThresholdReduction(rikishi1.fatigue);
-      if (r2Roll.total > thresh1) hasInjury1 = true;
+      if (r2Roll.total > thresh1) injuryHits1++;
       const thresh2 =
         getBaseInjuryThreshold(rikishi2.bashosCompleted) -
         getFatigueThresholdReduction(rikishi2.fatigue);
-      if (r1Roll.total > thresh2) hasInjury2 = true;
+      if (r1Roll.total > thresh2) injuryHits2++;
 
       const result = resolveTachiai(r1Roll.total, r2Roll.total);
       if (result === "matta") {
@@ -175,8 +175,8 @@ export function simulateFullBout(
       r1Bonus = r1Attacking ? round : 0;
       r2Bonus = !r1Attacking ? round : 0;
 
-      if (r1Move.counters?.includes(r2Move.id)) r1Ir = Math.max(r1Ir, 3);
-      if (r2Move.counters?.includes(r1Move.id)) r2Ir = Math.max(r2Ir, 3);
+      if (r1Move.counters?.includes(r2Move.id)) r1Ir = Math.max(r1Ir, r1Elite ? 9 : 7);
+      if (r2Move.counters?.includes(r1Move.id)) r2Ir = Math.max(r2Ir, r2Elite ? 9 : 7);
 
       // Specs
       const r1Spec = rikishi1.specializations?.find(
@@ -209,16 +209,16 @@ export function simulateFullBout(
       const thresh1 =
         getBaseInjuryThreshold(rikishi1.bashosCompleted) -
         getFatigueThresholdReduction(rikishi1.fatigue);
-      if (r2Roll.total > thresh1) hasInjury1 = true;
+      if (r2Roll.total > thresh1) injuryHits1++;
       const thresh2 =
         getBaseInjuryThreshold(rikishi2.bashosCompleted) -
         getFatigueThresholdReduction(rikishi2.fatigue);
-      if (r1Roll.total > thresh2) hasInjury2 = true;
+      if (r1Roll.total > thresh2) injuryHits2++;
 
       const attackerRoll = r1Attacking ? r1Roll : r2Roll;
       const defenderRoll = r1Attacking ? r2Roll : r1Roll;
 
-      if (attackerRoll.total <= defenderRoll.total + 3) {
+      if (attackerRoll.total > defenderRoll.total && attackerRoll.total <= defenderRoll.total + 4) {
         const monoii = performMonoii().result;
         if (monoii === "rematch") {
           round++;
@@ -234,7 +234,7 @@ export function simulateFullBout(
                 ? rikishi2.id
                 : rikishi1.id;
         }
-      } else if (attackerRoll.total > defenderRoll.total + 3) {
+      } else if (attackerRoll.total > defenderRoll.total + 4) {
         // Attacker Wins
         isFinished = true;
         winnerId = r1Attacking ? rikishi1.id : rikishi2.id;
@@ -284,8 +284,8 @@ export function simulateFullBout(
 
   return {
     winnerId,
-    hasInjury1,
-    hasInjury2,
+    injuryHits1,
+    injuryHits2,
     updatedR1: {
       ...rikishi1,
       focusPoints: r1Focus,

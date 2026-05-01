@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Rikishi, AttributeKey, RikishiStats } from '../types';
+import { Rikishi, AttributeKey, RikishiStats, Kimarite } from '../types';
 import { performTrainingRoll, getTrainingThreshold, getStatUpgradeCost, isStatLineLegal, getSpecializationSlots } from '../lib/gameLogic';
 import { DIVISIONS } from '../constants/world';
 import { Zap, Heart, Trophy, ChevronRight, Check, Dice5, Coffee, Activity, Award, Edit3 } from 'lucide-react';
 import RecoveryResolution from './RecoveryResolution';
 import ShikonaBuilder from './ShikonaBuilder';
+import { OFFENSIVE_MOVES } from '../constants/combat';
 
 interface InterBashoProps {
   rikishi: Rikishi;
@@ -20,14 +21,6 @@ const STAT_LABELS: Record<AttributeKey, string> = {
   technique: 'Technique',
   spirit: 'Spirit',
 };
-
-// Mock data for Specs until document arrives
-const MOCK_KIMARITE = [
-  { id: 'uwatenage', name: 'Uwatenage', stance: 'Yotsu', primary: 'power', secondary: 'technique' },
-  { id: 'yorikiri', name: 'Yorikiri', stance: 'Yotsu', primary: 'balance', secondary: 'power' },
-  { id: 'oshidashi', name: 'Oshidashi', stance: 'Oshi', primary: 'power', secondary: 'footwork' },
-  { id: 'kotenage', name: 'Kotenage', stance: 'Nagete', primary: 'technique', secondary: 'power' },
-];
 
 export default function InterBasho({ rikishi, updateRikishi, onFinish }: InterBashoProps) {
   const [phase, setPhase] = useState<'recovery' | 'recovery_resolution' | 'roll' | 'roll_result' | 'spend' | 'momentum' | 'specialization' | 'rename'>('recovery');
@@ -156,19 +149,30 @@ export default function InterBasho({ rikishi, updateRikishi, onFinish }: InterBa
     }));
   };
 
-  const handleSpecSelect = (kimarite: typeof MOCK_KIMARITE[0]) => {
-    setLocalRikishi(prev => ({
-      ...prev,
-      specializations: [
-        ...prev.specializations,
-        {
-          kimariteId: kimarite.id,
-          stanceId: kimarite.stance,
-          primaryAttr: kimarite.primary as AttributeKey,
-          secondaryAttr: kimarite.secondary as AttributeKey
-        }
-      ]
-    }));
+  const handleSpecSelect = (kimarite: Kimarite) => {
+    setLocalRikishi(prev => {
+      const isSelected = prev.specializations.some(s => s.kimariteId === kimarite.id);
+      if (isSelected) {
+        return {
+          ...prev,
+          specializations: prev.specializations.filter(s => s.kimariteId !== kimarite.id)
+        };
+      } else {
+        if (prev.specializations.length >= maxSpecSlots) return prev;
+        return {
+          ...prev,
+          specializations: [
+            ...prev.specializations,
+            {
+              kimariteId: kimarite.id,
+              stanceId: kimarite.stanceRequirement,
+              primaryAttr: kimarite.primaryAttr,
+              secondaryAttr: kimarite.secondaryAttr
+            }
+          ]
+        };
+      }
+    });
   };
 
   const handleRenameSubmit = () => {
@@ -468,29 +472,30 @@ export default function InterBasho({ rikishi, updateRikishi, onFinish }: InterBa
               </div>
 
               <div className="space-y-3">
-                {MOCK_KIMARITE.map(k => {
-                  const isStanceUsed = localRikishi.specializations.some(s => s.stanceId === k.stance);
-                  const meetsAttr = localRikishi.stats[k.primary as AttributeKey] >= 8 && localRikishi.stats[k.secondary as AttributeKey] >= 5;
+                {OFFENSIVE_MOVES.map(k => {
                   const isSelected = localRikishi.specializations.some(s => s.kimariteId === k.id);
+                  const isStanceUsed = localRikishi.specializations.some(s => s.stanceId === k.stanceRequirement && s.kimariteId !== k.id);
+                  const meetsAttr = localRikishi.stats[k.primaryAttr] >= 8 && localRikishi.stats[k.secondaryAttr] >= 5;
+                  const isDisabled = !isSelected && (isStanceUsed || !meetsAttr || !hasNewSpecSlot);
 
                   return (
                     <button
                       key={k.id}
-                      disabled={isStanceUsed || !meetsAttr || isSelected}
+                      disabled={isDisabled}
                       onClick={() => handleSpecSelect(k)}
                       className={`w-full text-left p-4 rounded-2xl border-2 transition-all flex justify-between items-center ${isSelected ? 'border-sumo-accent bg-white' : 'border-sumo-beige bg-white shadow-sm disabled:opacity-30'}`}
                     >
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="font-black text-sm uppercase tracking-tight">{k.name}</span>
-                          <span className="text-[8px] bg-sumo-soft px-1.5 py-0.5 rounded opacity-50">{k.stance} Stance</span>
+                          <span className="text-[8px] bg-sumo-soft px-1.5 py-0.5 rounded opacity-50">{k.stanceRequirement} Stance</span>
                         </div>
                         <div className="flex gap-2">
-                          <span className={`text-[9px] font-bold ${localRikishi.stats[k.primary as AttributeKey] >= 8 ? 'text-sumo-green' : 'text-red-500'}`}>
-                            {STAT_LABELS[k.primary as AttributeKey]} 8+
+                          <span className={`text-[9px] font-bold ${localRikishi.stats[k.primaryAttr] >= 8 ? 'text-sumo-green' : 'text-red-500'}`}>
+                            {STAT_LABELS[k.primaryAttr]} 8+
                           </span>
-                          <span className={`text-[9px] font-bold ${localRikishi.stats[k.secondary as AttributeKey] >= 5 ? 'text-sumo-green' : 'text-red-500'}`}>
-                            {STAT_LABELS[k.secondary as AttributeKey]} 5+
+                          <span className={`text-[9px] font-bold ${localRikishi.stats[k.secondaryAttr] >= 5 ? 'text-sumo-green' : 'text-red-500'}`}>
+                            {STAT_LABELS[k.secondaryAttr]} 5+
                           </span>
                         </div>
                       </div>
@@ -582,7 +587,7 @@ export default function InterBasho({ rikishi, updateRikishi, onFinish }: InterBa
             }}
             className="w-full bg-sumo-ink text-white p-4 rounded-2xl font-bold uppercase tracking-[0.2em] text-xs shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2"
           >
-            Skip Specialization <ChevronRight size={16} />
+            {hasNewSpecSlot ? 'Skip Specialization' : 'Confirm Specialization'} <ChevronRight size={16} />
           </button>
         )}
         {phase === 'momentum' && (

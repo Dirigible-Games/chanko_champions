@@ -15,9 +15,9 @@ interface CharacterCreationProps {
 
 const ARCHETYPES: Record<Exclude<RikishiArchetype, 'Custom'>, Partial<RikishiStats>> = {
   Yotsu: { power: 4, balance: 4, footwork: 2, technique: 3, spirit: 2, weight: 155 },
-  Nagete: { power: 3, balance: 4, footwork: 2, technique: 2, spirit: 4, weight: 145 },
-  Kakete: { power: 2, balance: 2, footwork: 4, technique: 4, spirit: 3, weight: 135 },
-  Tokushuwaza: { power: 4, balance: 2, footwork: 3, technique: 4, spirit: 2, weight: 140 },
+  Nagewaza: { power: 3, balance: 4, footwork: 2, technique: 2, spirit: 4, weight: 145 },
+  Ashiwaza: { power: 2, balance: 2, footwork: 4, technique: 4, spirit: 3, weight: 135 },
+  Kawari: { power: 4, balance: 2, footwork: 3, technique: 4, spirit: 2, weight: 140 },
   Oshi: { power: 2, balance: 3, footwork: 4, technique: 2, spirit: 4, weight: 160 },
 };
 
@@ -217,7 +217,7 @@ export default function CharacterCreation({ onComplete }: CharacterCreationProps
               className="space-y-4 pt-4"
             >
               <div className="grid grid-cols-2 gap-2">
-                {(['Yotsu', 'Nagete', 'Kakete', 'Tokushuwaza', 'Oshi', 'Custom'] as RikishiArchetype[]).map((arch) => (
+                {(['Yotsu', 'Nagewaza', 'Ashiwaza', 'Kawari', 'Oshi', 'Custom'] as RikishiArchetype[]).map((arch) => (
                   <div
                     key={arch}
                     role="button"

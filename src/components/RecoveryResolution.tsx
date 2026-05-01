@@ -153,17 +153,12 @@ export default function RecoveryResolution({ rikishi, onComplete }: RecoveryReso
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                 className="h-64 flex flex-col items-center justify-center space-y-4"
               >
-                <div className="flex gap-4">
-                  {[1, 2].map((n) => (
-                    <motion.div
-                      key={n}
-                      animate={{ rotate: [0, 90, 180, 270, 360], scale: [1, 1.1, 1] }}
-                      transition={{ duration: 0.3, repeat: Infinity }}
-                      className="w-16 h-16 bg-white border-2 border-sumo-green rounded-lg flex items-center justify-center text-2xl font-black text-sumo-green shadow-lg shadow-sumo-green/10"
-                    >
-                      ?
-                    </motion.div>
-                  ))}
+                <div className="flex items-center justify-center h-20">
+                  <motion.div 
+                    animate={{ rotate: 360 }} 
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    className="w-12 h-12 border-4 border-sumo-green/20 border-t-sumo-green rounded-full shadow-lg shadow-sumo-green/10"
+                  />
                 </div>
                 <p className="text-sm font-mono text-sumo-green uppercase tracking-widest animate-pulse">Healing in progress...</p>
               </motion.div>
@@ -177,10 +172,17 @@ export default function RecoveryResolution({ rikishi, onComplete }: RecoveryReso
               >
                 <div className="flex justify-center gap-4">
                   {recoveryDice.map((d, i) => (
-                    <div key={i} className={`w-16 h-16 rounded-lg flex flex-col items-center justify-center shadow-md border-2 transition-all ${d >= 33 ? 'bg-green-100 border-green-700 text-green-950 scale-110' : 'bg-white border-sumo-earth/20 text-sumo-ink opacity-60'}`}>
-                      <span className="text-2xl font-black">{d}</span>
-                      <span className="text-[8px] font-mono mt-0.5 uppercase tracking-tighter">{d >= 33 ? 'Success' : 'Fail'}</span>
-                    </div>
+                    <motion.div 
+                      key={i} 
+                      className={`w-16 h-16 rounded-xl shadow-md border-2 flex flex-col items-center justify-center font-black text-3xl relative overflow-hidden ${d >= 33 ? 'bg-green-50 border-green-700 text-green-950 shadow-green-500/10' : 'bg-white border-sumo-earth/20 text-sumo-ink/60 shadow-black/5'}`}
+                      initial={{ rotateX: 90, scale: 0.5, opacity: 0 }}
+                      animate={{ rotateX: 0, scale: 1, opacity: 1 }}
+                      transition={{ type: "spring", stiffness: 150, damping: 10, delay: i * 0.15 }}
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-b from-white/80 to-transparent"></div>
+                      <span className="relative z-10">{d}</span>
+                      <span className="absolute bottom-1 text-[8px] font-mono tracking-tighter uppercase opacity-80">{d >= 33 ? 'Success' : 'Fail'}</span>
+                    </motion.div>
                   ))}
                 </div>
 

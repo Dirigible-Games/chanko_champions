@@ -91,9 +91,9 @@ export function simulateAllBoutsForDay(
       result.updatedR2.losses += result.winnerId === r2.id ? 0 : 1;
       result.updatedR2.boutsFoughtThisBasho = (result.updatedR2.boutsFoughtThisBasho || 0) + 1;
 
-      if (result.hasInjury1) {
+      if (result.injuryHits1 > 0) {
         const attrs: AttributeKey[] = ["power", "balance", "footwork", "technique", "spirit"];
-        const severityResult = performInjuryRoll(result.updatedR1.fatigue);
+        const severityResult = performInjuryRoll(result.updatedR1.fatigue, result.injuryHits1);
         
         let targetAttr: AttributeKey | null = null;
         if (result.updatedR1.fatigue < 60) {
@@ -111,9 +111,9 @@ export function simulateAllBoutsForDay(
         });
       }
 
-      if (result.hasInjury2) {
+      if (result.injuryHits2 > 0) {
         const attrs: AttributeKey[] = ["power", "balance", "footwork", "technique", "spirit"];
-        const severityResult = performInjuryRoll(result.updatedR2.fatigue);
+        const severityResult = performInjuryRoll(result.updatedR2.fatigue, result.injuryHits2);
         
         let targetAttr: AttributeKey | null = null;
         if (result.updatedR2.fatigue < 60) {

@@ -62,7 +62,7 @@ interface BoutProps {
     fatigueUsed: boolean,
     focusSpent: number,
     finalRound: number,
-    hasInjuryTrigger: boolean
+    injuryHits: number
   }) => void;
 }
 
@@ -79,7 +79,7 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
     victoryKimarite: null,
     isMonoii: false,
     fatigueDieUsed: false,
-    hasInjuryTrigger: false
+    injuryHits: 0
   });
 
   const [monoiiData, setMonoiiData] = useState<{result: 'attacker'|'rematch'|'defender', roll: number, winnerId: 'player'|'opponent'} | null>(null);
@@ -100,6 +100,17 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
     player: { rolls: number[], total: number, usedFocus: boolean, usedFatigue: boolean, maxVal: number, irVal: number, moveName: string, statBonus: number, roundBonus: number, counterVal: number, primaryAttr: AttributeKey, secondaryAttr: AttributeKey, primaryVal: number, secondaryVal: number }, 
     opponent: { rolls: number[], total: number, usedFocus: boolean, usedFatigue: boolean, maxVal: number, irVal: number, moveName: string, statBonus: number, roundBonus: number, counterVal: number, primaryAttr: AttributeKey, secondaryAttr: AttributeKey, primaryVal: number, secondaryVal: number } 
   } | null>(null);
+
+  const [showMonoiiRoll, setShowMonoiiRoll] = useState(false);
+
+  useEffect(() => {
+    if (phase === 'monoii') {
+      const t = setTimeout(() => setShowMonoiiRoll(true), 1500);
+      return () => clearTimeout(t);
+    } else {
+      setShowMonoiiRoll(false);
+    }
+  }, [phase]);
 
   const getMoveName = (id: string) => [...TACHIAI_MOVES, ...OFFENSIVE_MOVES, ...DEFENSIVE_MOVES].find(m => m.id === id)?.name || id;
 
@@ -194,12 +205,12 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
 
     // Check Counters
     if (move.counters?.includes(opponentMove.id)) {
-      playerIr = isElite ? 8 : 6;
+      playerIr = isElite ? 9 : 7;
       pCounterVal = playerIr;
       addLog(`${move.name} counters ${opponentMove.name}!`);
     }
     if (opponentMove.counters?.includes(move.id)) {
-      opponentIr = (opponent.rank.title === 'Ozeki' || opponent.rank.title === 'Yokozuna') ? 8 : 6;
+      opponentIr = (opponent.rank.title === 'Ozeki' || opponent.rank.title === 'Yokozuna') ? 9 : 7;
       oCounterVal = opponentIr;
       addLog(`${opponentMove.name} counters ${move.name}!`);
     }
@@ -248,7 +259,7 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
     const currentThreshold = baseThreshold - thresholdReduction;
     
     if (oRoll.total > currentThreshold) {
-      setState(prev => ({ ...prev, hasInjuryTrigger: true }));
+      setState(prev => ({ ...prev, injuryHits: prev.injuryHits + 1 }));
     }
 
     setShowDice({ 
@@ -414,12 +425,12 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
     let oCounterVal = 0;
 
     if (playerMove.counters?.includes(opponentMove.id)) {
-      pIr = isElite ? 8 : 6;
+      pIr = isElite ? 9 : 7;
       pCounterVal = pIr;
       addLog(`${playerMove.name} counters ${opponentMove.name}!`);
     }
     if (opponentMove.counters?.includes(playerMove.id)) {
-      oIr = (opponent.rank.title === 'Ozeki' || opponent.rank.title === 'Yokozuna') ? 8 : 6;
+      oIr = (opponent.rank.title === 'Ozeki' || opponent.rank.title === 'Yokozuna') ? 9 : 7;
       oCounterVal = oIr;
       addLog(`${opponentMove.name} counters ${playerMove.name}!`);
     }
@@ -472,7 +483,7 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
     const currentThreshold = baseThreshold - thresholdReduction;
     
     if (oRoll.total > currentThreshold) {
-      setState(prev => ({ ...prev, hasInjuryTrigger: true }));
+      setState(prev => ({ ...prev, injuryHits: prev.injuryHits + 1 }));
     }
 
     setShowDice({ 
@@ -488,7 +499,7 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
       const defenderRoll = isPlayerAttacking ? oRoll.total : pRoll.total;
 
       if (attackerRoll > defenderRoll) {
-        const isMonoiiEligible = attackerRoll <= defenderRoll + 3;
+        const isMonoiiEligible = attackerRoll <= defenderRoll + 4;
         
         const resolveVictory = () => {
            const winnerId = isPlayerAttacking ? 'player' : 'opponent';
@@ -515,7 +526,7 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
         const dRoll = isPlayerAttacking ? oRoll.total : pRoll.total;
         const aRoll = isPlayerAttacking ? pRoll.total : oRoll.total;
         
-        if (dRoll >= aRoll + 50) {
+        if (dRoll >= aRoll + 38) {
            addLog("CRITICAL DEFENSE! Defender earns momentum for next round (+4).");
         }
 
@@ -618,25 +629,57 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
                    </p>
                  </div>
 
-                 <div className="flex flex-col items-center justify-center my-4 bg-white/70 py-4 rounded-xl border border-sumo-earth/40 shadow-inner">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-sumo-ink/50 mb-2">Shinpan's Roll (1d10)</div>
-                    <div className="w-16 h-16 bg-white border-2 border-sumo-ink rounded-lg shadow-md flex items-center justify-center font-serif text-3xl font-black text-sumo-ink">
-                      {monoiiData.roll}
-                    </div>
-                    <div className="mt-3 text-sm font-bold uppercase tracking-widest text-red-800">
-                      {monoiiData.result === 'attacker' && "Ruling Stands"}
-                      {monoiiData.result === 'defender' && "Ruling Reversed"}
-                      {monoiiData.result === 'rematch' && "Torinaoshi (Rematch)"}
-                    </div>
+                 <div className="flex flex-col items-center justify-center my-4 bg-sumo-earth/10 py-6 rounded-xl shadow-inner border border-sumo-earth/20 min-h-[160px]">
+                    <div className="text-[10px] font-black uppercase tracking-widest text-sumo-ink/50 mb-3 block">Shinpan's Roll (1d10)</div>
+                    {showMonoiiRoll ? (
+                      <>
+                        <motion.div 
+                          className="w-20 h-20 bg-white border-2 border-sumo-ink/30 rounded-xl shadow-md shadow-black/10 flex items-center justify-center font-black text-4xl text-sumo-ink relative overflow-hidden"
+                          initial={{ rotateX: 90, scale: 0.5, opacity: 0 }}
+                          animate={{ rotateX: 0, scale: 1, opacity: 1 }}
+                          transition={{ type: "spring", stiffness: 150, damping: 10 }}
+                        >
+                          <div className="absolute inset-0 bg-gradient-to-b from-white/80 to-transparent"></div>
+                          <span className="relative z-10">{monoiiData.roll}</span>
+                        </motion.div>
+                        <motion.div 
+                          initial={{ opacity: 0, y: 5 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.6 }}
+                          className="mt-4 px-4 py-2 bg-white rounded-lg border border-sumo-earth/30 shadow-sm"
+                        >
+                          <div className="text-sm font-black uppercase tracking-widest text-red-900">
+                            {monoiiData.result === 'attacker' && "Ruling Stands"}
+                            {monoiiData.result === 'defender' && "Ruling Reversed"}
+                            {monoiiData.result === 'rematch' && "Torinaoshi (Rematch)"}
+                          </div>
+                        </motion.div>
+                      </>
+                    ) : (
+                      <div className="flex items-center justify-center h-20">
+                        <motion.div 
+                          animate={{ rotate: 360 }} 
+                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                          className="w-8 h-8 border-4 border-sumo-ink/20 border-t-sumo-ink rounded-full"
+                        />
+                      </div>
+                    )}
                  </div>
 
                  <div className="w-full max-w-[280px] mx-auto">
-                    <button
-                     onClick={handleMonoiiResolution}
-                     className="w-full bg-[#362624] text-white py-3.5 rounded-lg font-bold uppercase tracking-[0.15em] text-xs shadow-md shadow-black/20 hover:bg-black active:scale-95 transition-all outline-none"
-                   >
-                     Acknowledge
-                   </button>
+                   <AnimatePresence>
+                     {showMonoiiRoll && (
+                       <motion.button
+                         initial={{ opacity: 0, y: 10 }}
+                         animate={{ opacity: 1, y: 0 }}
+                         transition={{ delay: 1 }}
+                         onClick={handleMonoiiResolution}
+                         className="w-full bg-[#362624] text-white py-3.5 rounded-lg font-bold uppercase tracking-[0.15em] text-xs shadow-md shadow-black/20 hover:bg-black active:scale-95 transition-all outline-none"
+                       >
+                         Acknowledge
+                       </motion.button>
+                     )}
+                   </AnimatePresence>
                  </div>
             </motion.div>
           </motion.div>
@@ -1194,7 +1237,7 @@ export default function Bout({ rikishi, opponent, onFinish }: BoutProps) {
                       fatigueUsed: !!state.fatigueDieUsed,
                       focusSpent: rikishi.focusPoints - state.focusPoints,
                       finalRound: state.round,
-                      hasInjuryTrigger: state.hasInjuryTrigger
+                      injuryHits: state.injuryHits
                     })}
                     className="w-full bg-[#362624] text-white py-3.5 rounded-lg font-bold uppercase tracking-[0.15em] text-xs shadow-md shadow-black/20 hover:bg-black active:scale-95 transition-all outline-none"
                   >
