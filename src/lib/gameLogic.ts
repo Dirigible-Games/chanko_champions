@@ -354,7 +354,7 @@ export function performTrainingRoll(bashos: number, lastBashoRecord?: CareerReco
   const threshold = getTrainingThreshold(bashos);
   const rolls = Array.from({ length: 4 }, () => secureRandomInt(40) + dieBonus);
   const successes = rolls.filter(r => r >= threshold).length;
-  const tp = successes;
+  const tp = successes + 3;
   
   return { successes, tp, rolls };
 }
