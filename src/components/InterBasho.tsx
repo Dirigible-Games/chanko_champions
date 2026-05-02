@@ -321,8 +321,11 @@ export default function InterBasho({ rikishi, updateRikishi, onFinish }: InterBa
 
               <div className="mb-12">
                  <span className="text-[10px] font-black uppercase text-sumo-accent tracking-widest">Total TP Granted</span>
-                 <p className="text-6xl font-serif italic text-sumo-ink font-black">
+                 <p className="text-6xl font-serif italic text-sumo-ink font-black mt-2">
                    +{rollResult.tp}
+                 </p>
+                 <p className="text-[10px] font-bold text-sumo-ink/40 mt-3 uppercase tracking-[0.2em]">
+                   (3 Guaranteed + {rollResult.successes} from successes)
                  </p>
               </div>
 

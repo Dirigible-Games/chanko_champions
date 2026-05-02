@@ -26,6 +26,7 @@ import {
 import { calculateMomentumPoints } from "./gameLogic";
 import { simulateFullBout } from "./combatEngine";
 import { generateNPCRikishi } from "./worldGeneration";
+import { generateBashoScheduleForDay } from "./tournamentScheduler";
 
 export function simulateAllBoutsForDay(
   schedule: BoutPairing[],
@@ -173,9 +174,13 @@ export function simulateBashoEnd(
   });
 
   if (worldState.bashoSchedule) {
+    let currentSchedule = [...worldState.bashoSchedule];
     for (let d = worldState.currentBashoDay || 1; d <= 15; d++) {
+      const nextDaySchedule = generateBashoScheduleForDay(currentRikishiList, currentSchedule, d);
+      currentSchedule = [...currentSchedule, ...nextDaySchedule];
+
       currentRikishiList = simulateAllBoutsForDay(
-        worldState.bashoSchedule,
+        currentSchedule,
         currentRikishiList,
         d,
         playerRikishi.id,
