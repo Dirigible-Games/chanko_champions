@@ -210,6 +210,15 @@ export function simulateBashoEnd(
   currentRikishiList.forEach(r => oldRanksMap.set(r.id, { ...r.rank }));
 
   const rikishiWithRecords = currentRikishiList.map((r) => {
+    // RECONCILE ABSENCES to ensure wins + losses sum to division bouts scheduled
+    const divisionInfo = DIVISIONS.find(d => d.name === r.rank.division);
+    const expectedBouts = divisionInfo ? divisionInfo.bouts : 15;
+    const actualBouts = r.wins + r.losses;
+    
+    if (actualBouts < expectedBouts) {
+      r.losses += (expectedBouts - actualBouts);
+    }
+
     if (r.id === playerRikishi.id) return r;
 
     if (r.isNPC) {
