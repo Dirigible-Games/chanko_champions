@@ -121,6 +121,19 @@ function AppContent() {
           (r) => r.id === parsedWorld.playerRikishiId,
         );
 
+        // Migrate historical data: reconcile missing losses in past records
+        parsedWorld.rikishi.forEach(r => {
+          if (r.careerHistory) {
+            r.careerHistory.forEach(history => {
+              const divInfo = DIVISIONS.find(d => d.name === history.rank.division);
+              const maxBouts = divInfo ? divInfo.bouts : 15;
+              if (history.wins + history.losses < maxBouts) {
+                history.losses += (maxBouts - (history.wins + history.losses));
+              }
+            });
+          }
+        });
+
         // --- SAVE PHYSICIAN RECOVERY LOGIC ---
         // Scenario 1: Player is missing from the world list (Orphaned)
         if (!player && parsedWorld.playerRikishiId) {
