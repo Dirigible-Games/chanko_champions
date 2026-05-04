@@ -17,7 +17,7 @@ export function generateBashoScheduleForDay(
     // Only generate matches if this division is supposed to fight today
     if (dayToGenerate <= totalDays) {
       // Filter active rikishi
-      const rikishiInDiv = allRikishi.filter(r => r.rank.division === divName && r.status !== 'retired');
+      const rikishiInDiv = allRikishi.filter(r => r.rank.division === divName && r.status !== 'retired' && r.status !== 'kyujo');
       
       // Group by score (wins)
       const scoreGroups = new Map<number, Rikishi[]>();

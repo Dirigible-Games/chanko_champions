@@ -117,62 +117,80 @@ function AppContent() {
       try {
         const parsedWorld: WorldState = JSON.parse(savedWorld);
         
-        let player = parsedWorld.rikishi.find(
-          (r) => r.id === parsedWorld.playerRikishiId,
-        );
+        try {
+          let player = parsedWorld.rikishi?.find(
+            (r) => r.id === parsedWorld.playerRikishiId || r.isNPC === false,
+          );
 
-        // Migrate historical data: reconcile missing losses in past records
-        parsedWorld.rikishi.forEach(r => {
-          if (r.careerHistory) {
-            r.careerHistory.forEach(history => {
-              const divInfo = DIVISIONS.find(d => d.name === history.rank.division);
-              const maxBouts = divInfo ? divInfo.bouts : 15;
-              if (history.wins + history.losses < maxBouts) {
-                history.losses += (maxBouts - (history.wins + history.losses));
+          if (player && !parsedWorld.playerRikishiId) {
+             parsedWorld.playerRikishiId = player.id;
+          }
+
+          // Migrate historical data: reconcile missing losses in past records
+          if (Array.isArray(parsedWorld.rikishi)) {
+            parsedWorld.rikishi.forEach(r => {
+              if (r.id !== parsedWorld.playerRikishiId && r.careerHistory && r.careerHistory.length > 4) {
+                r.careerHistory = r.careerHistory.slice(-4);
+              }
+              if (r.careerHistory) {
+                r.careerHistory.forEach(history => {
+                  if (history && history.rank && history.rank.division) {
+                    const divInfo = DIVISIONS.find(d => d.name === history.rank.division);
+                    const maxBouts = divInfo ? divInfo.bouts : 15;
+                    const w = history.wins || 0;
+                    const l = history.losses || 0;
+                    if (w + l < maxBouts) {
+                      history.losses = l + (maxBouts - (w + l));
+                    }
+                  }
+                });
               }
             });
           }
-        });
 
-        // --- SAVE PHYSICIAN RECOVERY LOGIC ---
-        // Scenario 1: Player is missing from the world list (Orphaned)
-        if (!player && parsedWorld.playerRikishiId) {
-          console.warn("Save Physician: Player orphaned. Attempting reconstruction.");
-          const legacyPlayer = localStorage.getItem("chanko_rikishi");
-          if (legacyPlayer) {
-            const recovered = JSON.parse(legacyPlayer);
-            if (recovered && recovered.id === parsedWorld.playerRikishiId) {
-              player = recovered;
-              parsedWorld.rikishi.push(player);
+          // --- SAVE PHYSICIAN RECOVERY LOGIC ---
+          if (!player) {
+            console.warn("Save Physician: Player orphaned. Attempting reconstruction.");
+            const legacyPlayer = localStorage.getItem("chanko_rikishi");
+            if (legacyPlayer) {
+              const recovered = JSON.parse(legacyPlayer);
+              if (recovered && (!parsedWorld.playerRikishiId || recovered.id === parsedWorld.playerRikishiId)) {
+                player = recovered;
+                parsedWorld.playerRikishiId = recovered.id;
+                parsedWorld.rikishi.push(player);
+              }
             }
           }
-        }
 
-        // Scenario 2: World list was empty/corrupted
-        if (!parsedWorld.rikishi || parsedWorld.rikishi.length === 0) {
-          console.warn("Save Physician: World corrupt. Re-seeding.");
-          const newWorldList = seedWorld();
-          parsedWorld.rikishi = newWorldList;
-          // Re-insert player if we have one
-          if (player) parsedWorld.rikishi.push(player);
-        }
+          if (!parsedWorld.rikishi || parsedWorld.rikishi.length === 0) {
+            console.warn("Save Physician: World corrupt. Re-seeding.");
+            const newWorldList = seedWorld();
+            parsedWorld.rikishi = newWorldList;
+            if (player) parsedWorld.rikishi.push(player);
+          }
 
-        // Scenario 3: Player exists but rank data is corrupted
-        if (player && (!player.rank || !player.rank.division)) {
-          console.warn("Save Physician: Repairing player rank.");
-          player.rank = { division: "Jonokuchi", title: 1, side: "East" };
-        }
-        // -------------------------------------
+          if (player && (!player.rank || !player.rank.division)) {
+            console.warn("Save Physician: Repairing player rank.");
+            player.rank = { division: "Jonokuchi", title: 1, side: "East" };
+          }
+          // -------------------------------------
 
-        setWorldState(parsedWorld);
-        if (player) {
-          setRikishi(player);
-          // Update the world state back to storage with the repairs if any happened
-          localStorage.setItem("chanko_world_state", JSON.stringify(parsedWorld));
+          setWorldState(parsedWorld);
+          if (player) {
+            setRikishi(player);
+            localStorage.setItem("chanko_world_state", JSON.stringify(parsedWorld));
+          }
+        } catch (migrationError) {
+           console.error("Save Physician: Error during migration of world state", migrationError);
+           // Try to load it anyway even if migration had a glitch
+           setWorldState(parsedWorld);
+           const p = parsedWorld.rikishi?.find((r) => r.id === parsedWorld.playerRikishiId);
+           if (p) setRikishi(p);
         }
       } catch (e) {
-        console.error("Save Physician: Failed to parse world state", e);
-        localStorage.removeItem("chanko_world_state"); // Clear corrupted state
+        console.error("Save Physician: Failed to parse world state JSON", e);
+        // Only clear if the JSON itself is unparseable
+        localStorage.removeItem("chanko_world_state"); 
       }
     } else {
       // Backwards compatibility for older saves
@@ -250,50 +268,71 @@ function AppContent() {
   };
 
   const handleCreationComplete = (newRikishi: Rikishi) => {
+    // Reconcile absences in career history (migrating old bugs or corrupted state)
+    if (newRikishi.careerHistory) {
+      newRikishi.careerHistory.forEach(history => {
+        const divInfo = DIVISIONS.find(d => d.name === history.rank.division);
+        const maxBouts = divInfo ? divInfo.bouts : 15;
+        if (history.wins + history.losses < maxBouts) {
+          history.losses += (maxBouts - (history.wins + history.losses));
+        }
+      });
+    }
+
     const generatedWorld = seedWorld();
-    const jonokuchiCount = generatedWorld.filter(
-      (r) => r.rank.division === "Jonokuchi",
-    ).length;
-
-    // Calculate the absolute bottom of the generated division for the new player
-    const playerIndex = jonokuchiCount; // Because it's 0-indexed, the next spot is exactly the count
-    const isEast = playerIndex % 2 === 0;
-    const bottomNumericalRank = Math.floor(playerIndex / 2) + 1;
-
-    const configuredRikishi = {
-      ...newRikishi,
-      rank: {
-        division: "Jonokuchi" as const,
-        title: bottomNumericalRank,
-        side: isEast ? ("East" as const) : ("West" as const),
-      },
-    };
+    
+    // Check if player is already in the list
+    if (!generatedWorld.find(r => r.id === newRikishi.id)) {
+      generatedWorld.push(newRikishi);
+    }
+    
+    // In case of a fallback from a corrupted save, we extract year/month from the player's last known career record
+    let recoveredYear = new Date().getFullYear();
+    let recoveredMonth = 0;
+    
+    if (newRikishi.careerHistory && newRikishi.careerHistory.length > 0) {
+      const last = newRikishi.careerHistory[newRikishi.careerHistory.length - 1];
+      recoveredYear = last.year;
+      recoveredMonth = parseInt(last.month);
+    }
 
     const newWorld: WorldState = {
-      currentMonth: 0,
-      currentYear: new Date().getFullYear(),
-      rikishi: [...generatedWorld, configuredRikishi],
-      playerRikishiId: configuredRikishi.id,
+      currentMonth: recoveredMonth,
+      currentYear: recoveredYear,
+      rikishi: generatedWorld,
+      playerRikishiId: newRikishi.id,
       news: [],
     };
 
     setWorldState(newWorld);
-    setRikishi(configuredRikishi);
+    setRikishi(newRikishi);
     localStorage.setItem("chanko_world_state", JSON.stringify(newWorld));
     setView("dashboard");
   };
 
   const saveRikishi = (updated: Rikishi) => {
     setRikishi(updated);
+    try {
+      localStorage.setItem("chanko_rikishi", JSON.stringify(updated));
+    } catch (e) {
+      console.warn("Failed to save chanko_rikishi to localStorage", e);
+    }
+
     if (worldState) {
       const updatedWorld = {
         ...worldState,
+        playerRikishiId: updated.id,
         rikishi: worldState.rikishi.map((r) =>
           r.id === updated.id ? updated : r,
         ),
       };
       setWorldState(updatedWorld);
-      localStorage.setItem("chanko_world_state", JSON.stringify(updatedWorld));
+      try {
+        localStorage.setItem("chanko_world_state", JSON.stringify(updatedWorld));
+      } catch (e) {
+        console.warn("Failed to save chanko_world_state to localStorage, checking quota", e);
+        alert("Warning: LocalStorage quota exceeded. Some progress may not be saved. Please report this issue.");
+      }
     }
   };
 
@@ -835,8 +874,11 @@ function AppContent() {
                                   {abbreviateRank(record.rank)}
                                 </span>
                               </p>
-                              <div className="text-xl font-mono font-black text-sumo-ink">
-                                {record.wins} - {record.losses}
+                              <div className="text-xl font-mono font-black text-sumo-ink flex items-center justify-center gap-2">
+                                <span>{record.wins} - {record.losses}</span>
+                                {(record.wins + record.losses < (DIVISIONS.find(d => d.name === record.rank.division)?.bouts || 15)) && (
+                                  <span className="text-red-500 font-bold text-sm bg-red-50 px-2 py-0.5 rounded">(K)</span>
+                                )}
                               </div>
                               {record.isYusho && (
                                 <div className="text-[9px] uppercase font-bold text-yellow-600 mt-2 tracking-widest">

@@ -83,6 +83,16 @@ export default function Dashboard({ rikishi, onAction }: DashboardProps) {
           </div>
         </div>
 
+        {/* Momentum Banner - Compacted */}
+        {rikishi.momentum.attribute && (
+          <div className="bg-orange-50 border border-orange-200 rounded-xl p-2 flex items-center justify-center gap-1.5 shadow-sm">
+            <Zap size={14} className="fill-orange-500 text-orange-500" />
+            <p className="text-[10px] font-bold text-orange-700 uppercase tracking-widest leading-none mt-0.5">
+              Momentum: +{rikishi.momentum.value} {rikishi.momentum.attribute}
+            </p>
+          </div>
+        )}
+
         {/* Status Negatives Banner - Compacted */}
         {(Object.values(rikishi.injuries).some(i => i.severity > 0) || Object.values(rikishi.permanentPenalties).some(p => p > 0)) && (
           <button 

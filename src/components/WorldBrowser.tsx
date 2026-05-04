@@ -132,7 +132,10 @@ export default function WorldBrowser({ worldState }: WorldBrowserProps) {
                             <div key={i} className="flex justify-between opacity-80">
                               <span>{h.year} {BASHO_NAMES[parseInt(h.month)] || `Basho ${h.month}`}</span>
                               <span className="font-serif italic">{abbreviateRank(h.rank)}</span>
-                              <span className="font-bold">{h.wins}-{h.losses}</span>
+                              <span className="font-bold">
+                                {h.wins}-{h.losses}
+                                {(h.wins + h.losses < (DIVISIONS.find(d => d.name === h.rank.division)?.bouts || 15)) && <span className="text-red-500 ml-1 font-bold">(K)</span>}
+                              </span>
                             </div>
                           ))}
                         </div>

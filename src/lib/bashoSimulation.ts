@@ -210,15 +210,6 @@ export function simulateBashoEnd(
   currentRikishiList.forEach(r => oldRanksMap.set(r.id, { ...r.rank }));
 
   const rikishiWithRecords = currentRikishiList.map((r) => {
-    // RECONCILE ABSENCES to ensure wins + losses sum to division bouts scheduled
-    const divisionInfo = DIVISIONS.find(d => d.name === r.rank.division);
-    const expectedBouts = divisionInfo ? divisionInfo.bouts : 15;
-    const actualBouts = r.wins + r.losses;
-    
-    if (actualBouts < expectedBouts) {
-      r.losses += (expectedBouts - actualBouts);
-    }
-
     if (r.id === playerRikishi.id) return r;
 
     if (r.isNPC) {
@@ -257,6 +248,7 @@ export function simulateBashoEnd(
 
   const divisions = DIVISIONS.map((d) => d.name);
   let yushoWinners = new Set<string>();
+  let junYushoWinners = new Set<string>();
   
   divisions.forEach((divName) => {
     const divisionRikishi = rikishiWithRecords.filter(
@@ -299,6 +291,16 @@ export function simulateBashoEnd(
         remaining = remaining.filter(r => r.id !== boutLoserId);
       }
       winner = remaining[0];
+      
+      // The rest of the tied rikishi receive Jun-Yusho
+      tiedRikishi.filter(r => r.id !== winner.id).forEach(r => junYushoWinners.add(r.id));
+    } else {
+      // If there's no tie for maxWins, the next highest wins gets Jun-Yusho
+      const remainingWins = divisionRikishi.filter(r => r.wins < maxWins).map(r => r.wins);
+      if (remainingWins.length > 0) {
+        const nextMaxWins = Math.max(...remainingWins);
+        divisionRikishi.filter(r => r.wins === nextMaxWins).forEach(r => junYushoWinners.add(r.id));
+      }
     }
 
     // Refresh winner reference in case it was modified by simulateFullBout
@@ -350,31 +352,37 @@ export function simulateBashoEnd(
   }
 
   // Re-rank everyone globally
-  const rerankedAll = reRankAllDivisions(activeRikishiList, yushoWinners);
+  const rerankedAll = reRankAllDivisions(activeRikishiList, yushoWinners, junYushoWinners);
 
   const finalRikishiList: Rikishi[] = [];
 
   rerankedAll.forEach((r) => {
     const divisionInfo = DIVISIONS.find((d) => d.name === r.rank.division);
     const bouts = divisionInfo ? divisionInfo.bouts : 15;
-    const oldRank = oldRanksMap.get(r.id);
+    const oldRank = oldRanksMap.get(r.id) || { ...r.rank }; // Rookies won't have an old rank in the map
     
     const oldFormatted = formatRank(oldRank);
     const newFormatted = formatRank(r.rank);
     const isYusho = yushoWinners.has(r.id);
+    const isJunYusho = junYushoWinners.has(r.id);
 
     r.careerHistory = [
       ...(r.careerHistory || []),
       {
         year: worldState.currentYear,
         month: worldState.currentMonth.toString(),
-        rank: oldRank, // Use the actual rank they competed at
+        rank: oldRank, // Use the actual rank they competed at, fallback to their current one if new
         wins: r.wins,
         losses: r.losses,
         isYusho: isYusho,
-        isJunYusho: false,
+        isJunYusho: isJunYusho,
       },
     ];
+
+    // Cap NPC career history to the last 4 bashos to prevent localStorage QuotaExceededError
+    if (r.id !== playerRikishi.id && r.careerHistory.length > 4) {
+      r.careerHistory = r.careerHistory.slice(-4);
+    }
 
     if (oldFormatted !== newFormatted) {
       const isDemotion = r.wins < bouts / 2;
@@ -439,10 +447,12 @@ export function simulateBashoEnd(
       ...currentRikishi,
       wins: 0,
       losses: 0,
+      boutsFoughtThisBasho: 0,
       // Fatigue no longer resets to baseline; it persists to simulate aging/wear
     };
 
     if (r.id === playerRikishi.id) {
+      finalRikishi.fatigue = Math.min(100, finalRikishi.fatigue + 5);
       finalRikishi.momentum.value = calculateMomentumPoints(
         r,
         r.wins,
@@ -451,7 +461,7 @@ export function simulateBashoEnd(
         oldRank,
         r.rank,
         isYusho || false,
-        false,
+        isJunYusho || false,
       );
     }
     finalRikishiList.push(finalRikishi);

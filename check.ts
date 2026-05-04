@@ -19,6 +19,7 @@ const updatedWorld: WorldState = {
   rikishi: currentRikishiList,
   currentYear: 2024,
   currentMonth: 1,
+  playerRikishiId: player.id,
   news: [],
   bashoSchedule: currentSchedule,
   currentBashoDay: 8

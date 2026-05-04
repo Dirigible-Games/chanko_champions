@@ -291,7 +291,7 @@ export function simulateFullBout(
       focusPoints: r1Focus,
       fatigue: Math.min(
         100,
-        rikishi1.fatigue + (r1FatigueUsed ? 7 : 0) + Math.min(round, 10),
+        rikishi1.fatigue + (r1FatigueUsed ? 7 : 0) + (round > 3 ? round - 3 : 0),
       ),
     },
     updatedR2: {
@@ -299,7 +299,7 @@ export function simulateFullBout(
       focusPoints: r2Focus,
       fatigue: Math.min(
         100,
-        rikishi2.fatigue + (r2FatigueUsed ? 7 : 0) + Math.min(round, 10),
+        rikishi2.fatigue + (r2FatigueUsed ? 7 : 0) + (round > 3 ? round - 3 : 0),
       ),
     },
   };

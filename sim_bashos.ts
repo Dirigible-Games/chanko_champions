@@ -11,6 +11,7 @@ async function run() {
     rikishi: world,
     currentYear: 2024,
     currentMonth: 1,
+    playerRikishiId: playerRikishi.id,
     news: []
   };
 

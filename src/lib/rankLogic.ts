@@ -26,10 +26,13 @@ function getGlobalRankScore(rank: RankInfo): number {
   return offset + ((rank.title as number) * 2) - (rank.side === 'East' ? 1 : 0);
 }
 
-function getExpectedScore(rikishi: Rikishi, isYushoThisBasho: boolean): number {
+function getExpectedScore(rikishi: Rikishi, isYushoThisBasho: boolean, isJunYushoThisBasho: boolean = false): number {
    const { wins, losses, rank, careerHistory } = rikishi;
    const currentScore = getGlobalRankScore(rank);
-   const netWins = wins - losses;
+   const expectedTotalBouts = rank.division === 'Makuuchi' || rank.division === 'Juryo' ? 15 : 7;
+   const missingBouts = Math.max(0, expectedTotalBouts - (wins + losses));
+   const effectiveLosses = losses + missingBouts;
+   const netWins = wins - effectiveLosses;
    
    // Sanyaku stability
    if (rank.title === 'Yokozuna') return currentScore;
@@ -37,7 +40,7 @@ function getExpectedScore(rikishi: Rikishi, isYushoThisBasho: boolean): number {
    if (rank.title === 'Ozeki') {
       const isMakeKoshi = wins < 8; // Assuming 15 bouts
       const lastBasho = careerHistory[careerHistory.length - 1];
-      const lastWasMakeKoshi = lastBasho && lastBasho.wins < lastBasho.losses;
+      const lastWasMakeKoshi = lastBasho && lastBasho.wins < 8; // Ozeki is Makuuchi, so 15 bouts
       
       // Yokozuna promotion logic (2 Yusho in a row, or equivalent performance)
       if (isYushoThisBasho) {
@@ -85,7 +88,8 @@ function getExpectedScore(rikishi: Rikishi, isYushoThisBasho: boolean): number {
            // Must be Kachi-koshi in all three bashos for Ozeki consideration
            const allKachiKoshi = wins >= 8 && past1.wins >= (past1.wins + past1.losses >= 15 ? 8 : 4) && past2.wins >= (past2.wins + past2.losses >= 15 ? 8 : 4);
 
-           if (threeBashoWins >= 33 && allKachiKoshi && past1.rank.division === 'Makuuchi' && past2.rank.division === 'Makuuchi') {
+           const isWinnerOrRunnerUp = isYushoThisBasho || isJunYushoThisBasho;
+           if (threeBashoWins >= 33 && allKachiKoshi && isWinnerOrRunnerUp && past1.rank.division === 'Makuuchi' && past2.rank.division === 'Makuuchi') {
                return 3; 
            }
        }
@@ -103,10 +107,10 @@ function getExpectedScore(rikishi: Rikishi, isYushoThisBasho: boolean): number {
    return expected;
 }
 
-export function reRankAllDivisions(allRikishi: Rikishi[], yushoWinners: Set<string> = new Set()): Rikishi[] {
+export function reRankAllDivisions(allRikishi: Rikishi[], yushoWinners: Set<string> = new Set(), junYushoWinners: Set<string> = new Set()): Rikishi[] {
     const scoredRikishi = allRikishi.map(r => ({
         rikishi: r,
-        expectedScore: getExpectedScore(r, yushoWinners.has(r.id)),
+        expectedScore: getExpectedScore(r, yushoWinners.has(r.id), junYushoWinners.has(r.id)),
         currentScore: getGlobalRankScore(r.rank)
     }));
 
@@ -152,73 +156,91 @@ export function reRankAllDivisions(allRikishi: Rikishi[], yushoWinners: Set<stri
     const numKomusubi = 2;
     const numMaegashira = Math.max(0, numMakuuchiRemaining - numSekiwake - numKomusubi);
 
-    let poolIndex = 0;
+    const pullNextEligible = (targetDivision: Division) => {
+        for (let i = 0; i < generalPool.length; i++) {
+            const item = generalPool[i];
+            const currentDiv = item.rikishi.rank.division;
+            
+            let isEligible = true;
+            if (targetDivision === 'Makuuchi' && currentDiv !== 'Makuuchi' && currentDiv !== 'Juryo') isEligible = false;
+            else if (targetDivision === 'Juryo' && currentDiv !== 'Makuuchi' && currentDiv !== 'Juryo' && currentDiv !== 'Makushita') isEligible = false;
+            else if (targetDivision === 'Makushita' && currentDiv !== 'Makuuchi' && currentDiv !== 'Juryo' && currentDiv !== 'Makushita' && currentDiv !== 'Sandanme') isEligible = false;
+            else if (targetDivision === 'Sandanme' && currentDiv === 'Jonokuchi') isEligible = false;
+
+            if (isEligible) {
+                generalPool.splice(i, 1);
+                return item;
+            }
+        }
+        return generalPool.shift() ?? null;
+    };
     
     for (let i = 0; i < numSekiwake; i++) {
-        if (poolIndex >= generalPool.length) break;
-        generalPool[poolIndex].rikishi.rank = { division: 'Makuuchi', title: 'Sekiwake', side: i % 2 === 0 ? 'East' : 'West' };
-        newBanzuke.push(generalPool[poolIndex].rikishi);
-        poolIndex++;
+        const item = pullNextEligible('Makuuchi');
+        if (!item) break;
+        item.rikishi.rank = { division: 'Makuuchi', title: 'Sekiwake', side: i % 2 === 0 ? 'East' : 'West' };
+        newBanzuke.push(item.rikishi);
     }
 
     for (let i = 0; i < numKomusubi; i++) {
-        if (poolIndex >= generalPool.length) break;
-        generalPool[poolIndex].rikishi.rank = { division: 'Makuuchi', title: 'Komusubi', side: i % 2 === 0 ? 'East' : 'West' };
-        newBanzuke.push(generalPool[poolIndex].rikishi);
-        poolIndex++;
+        const item = pullNextEligible('Makuuchi');
+        if (!item) break;
+        item.rikishi.rank = { division: 'Makuuchi', title: 'Komusubi', side: i % 2 === 0 ? 'East' : 'West' };
+        newBanzuke.push(item.rikishi);
     }
 
     for (let i = 0; i < numMaegashira; i++) {
-        if (poolIndex >= generalPool.length) break;
+        const item = pullNextEligible('Makuuchi');
+        if (!item) break;
         const mTitle = Math.floor(i / 2) + 1;
-        generalPool[poolIndex].rikishi.rank = { division: 'Makuuchi', title: mTitle, side: i % 2 === 0 ? 'East' : 'West' };
-        newBanzuke.push(generalPool[poolIndex].rikishi);
-        poolIndex++;
+        item.rikishi.rank = { division: 'Makuuchi', title: mTitle, side: i % 2 === 0 ? 'East' : 'West' };
+        newBanzuke.push(item.rikishi);
     }
 
     for (let i = 0; i < 28; i++) {
-        if (poolIndex >= generalPool.length) break;
+        const item = pullNextEligible('Juryo');
+        if (!item) break;
         const jTitle = Math.floor(i / 2) + 1;
-        generalPool[poolIndex].rikishi.rank = { division: 'Juryo', title: jTitle, side: i % 2 === 0 ? 'East' : 'West' };
-        newBanzuke.push(generalPool[poolIndex].rikishi);
-        poolIndex++;
+        item.rikishi.rank = { division: 'Juryo', title: jTitle, side: i % 2 === 0 ? 'East' : 'West' };
+        newBanzuke.push(item.rikishi);
     }
 
     for (let i = 0; i < 120; i++) {
-        if (poolIndex >= generalPool.length) break;
+        const item = pullNextEligible('Makushita');
+        if (!item) break;
         const msTitle = Math.floor(i / 2) + 1;
-        generalPool[poolIndex].rikishi.rank = { division: 'Makushita', title: msTitle, side: i % 2 === 0 ? 'East' : 'West' };
-        newBanzuke.push(generalPool[poolIndex].rikishi);
-        poolIndex++;
+        item.rikishi.rank = { division: 'Makushita', title: msTitle, side: i % 2 === 0 ? 'East' : 'West' };
+        newBanzuke.push(item.rikishi);
     }
 
     for (let i = 0; i < 160; i++) {
-        if (poolIndex >= generalPool.length) break;
+        const item = pullNextEligible('Sandanme');
+        if (!item) break;
         const sdTitle = Math.floor(i / 2) + 1;
-        generalPool[poolIndex].rikishi.rank = { division: 'Sandanme', title: sdTitle, side: i % 2 === 0 ? 'East' : 'West' };
-        newBanzuke.push(generalPool[poolIndex].rikishi);
-        poolIndex++;
+        item.rikishi.rank = { division: 'Sandanme', title: sdTitle, side: i % 2 === 0 ? 'East' : 'West' };
+        newBanzuke.push(item.rikishi);
     }
 
     const currentJonokuchiSize = allRikishi.filter(r => r.rank.division === 'Jonokuchi').length;
-    const remainingForBottomTwo = generalPool.length - poolIndex;
+    const remainingForBottomTwo = generalPool.length;
     let targetJonidanSize = remainingForBottomTwo - currentJonokuchiSize;
     if (targetJonidanSize < 0) targetJonidanSize = remainingForBottomTwo;
 
     for (let i = 0; i < targetJonidanSize; i++) {
-        if (poolIndex >= generalPool.length) break;
+        const item = pullNextEligible('Jonidan');
+        if (!item) break;
         const jdTitle = Math.floor(i / 2) + 1;
-        generalPool[poolIndex].rikishi.rank = { division: 'Jonidan', title: jdTitle, side: i % 2 === 0 ? 'East' : 'West' };
-        newBanzuke.push(generalPool[poolIndex].rikishi);
-        poolIndex++;
+        item.rikishi.rank = { division: 'Jonidan', title: jdTitle, side: i % 2 === 0 ? 'East' : 'West' };
+        newBanzuke.push(item.rikishi);
     }
 
     let jkCount = 0;
-    while (poolIndex < generalPool.length) {
+    while (generalPool.length > 0) {
+        const item = generalPool.shift();
+        if (!item) break;
         const jkTitle = Math.floor(jkCount / 2) + 1;
-        generalPool[poolIndex].rikishi.rank = { division: 'Jonokuchi', title: jkTitle, side: jkCount % 2 === 0 ? 'East' : 'West' };
-        newBanzuke.push(generalPool[poolIndex].rikishi);
-        poolIndex++;
+        item.rikishi.rank = { division: 'Jonokuchi', title: jkTitle, side: jkCount % 2 === 0 ? 'East' : 'West' };
+        newBanzuke.push(item.rikishi);
         jkCount++;
     }
 
@@ -322,7 +344,9 @@ export function calculateRankChange(rikishi: Rikishi, wins: number, bouts: numbe
     // Sanyaku logic: Ozeki/Yokozuna demotion
     const isMakeKoshi = wins < bouts / 2;
     const lastBasho = rikishi.careerHistory[rikishi.careerHistory.length - 1];
-    const lastWasMakeKoshi = lastBasho && lastBasho.wins < (lastBasho.wins + lastBasho.losses) / 2;
+    
+    // For Sanyaku, they are always in Makuuchi, so 15 bouts is the denominator.
+    const lastWasMakeKoshi = lastBasho && lastBasho.wins < 8;
 
     if (current.title === 'Ozeki' && isMakeKoshi && lastWasMakeKoshi) {
       // Demoted!
