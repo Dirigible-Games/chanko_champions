@@ -1,6 +1,7 @@
 import { Rikishi } from '../types';
 import { Heart, Zap } from 'lucide-react';
 import { formatRank } from '../lib/rankLogic';
+import { DIVISIONS } from '../constants/world';
 
 interface HeaderProps {
   rikishi: Rikishi;
@@ -24,6 +25,9 @@ export default function Header({ rikishi }: HeaderProps) {
           </span>
           <span className="block text-lg font-bold text-sumo-accent">
             {rikishi.wins} — {rikishi.losses}
+            {rikishi.status === 'kyujo' && (
+              ` — ${(DIVISIONS.find(d => d.name === rikishi.rank.division)?.bouts || 15) - (rikishi.wins + rikishi.losses)}`
+            )}
           </span>
         </div>
       </div>

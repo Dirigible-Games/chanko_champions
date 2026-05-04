@@ -117,7 +117,12 @@ export default function WorldBrowser({ worldState }: WorldBrowserProps) {
                          <div className="font-bold flex items-center justify-end gap-1 mb-1 opacity-60">
                           <Award size={12} /> Record
                         </div>
-                        <div className="font-bold text-lg text-sumo-accent">{r.wins} - {r.losses}</div>
+                        <div className="font-bold text-lg text-sumo-accent">
+                          {r.wins} - {r.losses}
+                          {r.status === 'kyujo' && r.boutsFoughtThisBasho !== undefined && (
+                            ` - ${(DIVISIONS.find(d => d.name === r.rank.division)?.bouts || 15) - (r.wins + r.losses)}`
+                          )}
+                        </div>
                         <div className="opacity-60">{r.bashosCompleted} Basho</div>
                       </div>
                     </div>
@@ -134,7 +139,7 @@ export default function WorldBrowser({ worldState }: WorldBrowserProps) {
                               <span className="font-serif italic">{abbreviateRank(h.rank)}</span>
                               <span className="font-bold">
                                 {h.wins}-{h.losses}
-                                {(h.wins + h.losses < (DIVISIONS.find(d => d.name === h.rank.division)?.bouts || 15)) && <span className="text-red-500 ml-1 font-bold">(K)</span>}
+                                {(h.wins + h.losses < (DIVISIONS.find(d => d.name === h.rank.division)?.bouts || 15)) && `-${(DIVISIONS.find(d => d.name === h.rank.division)?.bouts || 15) - (h.wins + h.losses)}`}
                               </span>
                             </div>
                           ))}

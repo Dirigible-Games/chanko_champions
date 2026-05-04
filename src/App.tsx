@@ -875,10 +875,9 @@ function AppContent() {
                                 </span>
                               </p>
                               <div className="text-xl font-mono font-black text-sumo-ink flex items-center justify-center gap-2">
-                                <span>{record.wins} - {record.losses}</span>
-                                {(record.wins + record.losses < (DIVISIONS.find(d => d.name === record.rank.division)?.bouts || 15)) && (
-                                  <span className="text-red-500 font-bold text-sm bg-red-50 px-2 py-0.5 rounded">(K)</span>
-                                )}
+                                <span>{record.wins} - {record.losses}{(record.wins + record.losses < (DIVISIONS.find(d => d.name === record.rank.division)?.bouts || 15)) && (
+                                  ` - ${(DIVISIONS.find(d => d.name === record.rank.division)?.bouts || 15) - (record.wins + record.losses)}`
+                                )}</span>
                               </div>
                               {record.isYusho && (
                                 <div className="text-[9px] uppercase font-bold text-yellow-600 mt-2 tracking-widest">
