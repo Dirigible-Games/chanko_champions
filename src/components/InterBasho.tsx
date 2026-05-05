@@ -48,7 +48,8 @@ export default function InterBasho({ rikishi, updateRikishi, onFinish }: InterBa
       const lastRecord = rikishi.careerHistory?.[rikishi.careerHistory.length - 1];
       const divInfo = DIVISIONS.find(d => d.name === (lastRecord ? lastRecord.rank.division : rikishi.rank.division));
       const boutsScheduled = divInfo ? divInfo.bouts : 15;
-      const isKyujoEarly = (rikishi.boutsFoughtThisBasho !== undefined) && (rikishi.boutsFoughtThisBasho < boutsScheduled / 2);
+      const boutsFought = lastRecord ? (lastRecord.wins + lastRecord.losses) : 0;
+      const isKyujoEarly = boutsFought < (boutsScheduled / 2);
       
       const result = performTrainingRoll(rikishi.bashosCompleted, lastRecord, isKyujoEarly);
       setRollResult(result);
@@ -74,7 +75,8 @@ export default function InterBasho({ rikishi, updateRikishi, onFinish }: InterBa
     const lastRecord = rikishi.careerHistory?.[rikishi.careerHistory.length - 1];
     const divInfo = DIVISIONS.find(d => d.name === (lastRecord ? lastRecord.rank.division : rikishi.rank.division));
     const boutsScheduled = divInfo ? divInfo.bouts : 15;
-    const isKyujoEarly = (rikishi.boutsFoughtThisBasho !== undefined) && (rikishi.boutsFoughtThisBasho < boutsScheduled / 2);
+    const boutsFought = lastRecord ? (lastRecord.wins + lastRecord.losses) : 0;
+    const isKyujoEarly = boutsFought < (boutsScheduled / 2);
     
     const result = performTrainingRoll(rikishi.bashosCompleted, lastRecord, isKyujoEarly);
     setRollResult(result);
@@ -303,7 +305,7 @@ export default function InterBasho({ rikishi, updateRikishi, onFinish }: InterBa
               
               <div className="flex gap-2 mb-8 items-center justify-center">
                 {rollResult.rolls.map((val, idx) => {
-                  const threshold = getTrainingThreshold(localRikishi.bashosCompleted);
+                  const threshold = getTrainingThreshold(rikishi.bashosCompleted);
                   const isSuccess = val >= threshold;
                   return (
                     <motion.div 
@@ -325,7 +327,7 @@ export default function InterBasho({ rikishi, updateRikishi, onFinish }: InterBa
                    +{rollResult.tp}
                  </p>
                  <p className="text-[10px] font-bold text-sumo-ink/40 mt-3 uppercase tracking-[0.2em]">
-                   (3 Guaranteed + {rollResult.successes} from successes)
+                   ({Math.max(0, rollResult.tp - rollResult.successes)} Guaranteed + {rollResult.successes} from successes)
                  </p>
               </div>
 
