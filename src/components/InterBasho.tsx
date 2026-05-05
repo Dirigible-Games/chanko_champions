@@ -46,7 +46,7 @@ export default function InterBasho({ rikishi, updateRikishi, onFinish }: InterBa
   useEffect(() => {
     if (rikishi.bashosCompleted >= 20 && phase === 'roll') {
       const lastRecord = rikishi.careerHistory?.[rikishi.careerHistory.length - 1];
-      const divInfo = DIVISIONS.find(d => d.name === rikishi.rank.division);
+      const divInfo = DIVISIONS.find(d => d.name === (lastRecord ? lastRecord.rank.division : rikishi.rank.division));
       const boutsScheduled = divInfo ? divInfo.bouts : 15;
       const isKyujoEarly = (rikishi.boutsFoughtThisBasho !== undefined) && (rikishi.boutsFoughtThisBasho < boutsScheduled / 2);
       
@@ -72,7 +72,7 @@ export default function InterBasho({ rikishi, updateRikishi, onFinish }: InterBa
 
   const handleRoll = () => {
     const lastRecord = rikishi.careerHistory?.[rikishi.careerHistory.length - 1];
-    const divInfo = DIVISIONS.find(d => d.name === rikishi.rank.division);
+    const divInfo = DIVISIONS.find(d => d.name === (lastRecord ? lastRecord.rank.division : rikishi.rank.division));
     const boutsScheduled = divInfo ? divInfo.bouts : 15;
     const isKyujoEarly = (rikishi.boutsFoughtThisBasho !== undefined) && (rikishi.boutsFoughtThisBasho < boutsScheduled / 2);
     
